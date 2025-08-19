@@ -28,7 +28,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'offer_letter',
     title: 'Offer Letter',
     description: 'Upload your internship offer letter from the company. This must be approved before other assignments.',
-    bucket: 'internship-offer-letters',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: true
   },
@@ -36,7 +36,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'completion_letter',
     title: 'Completion Letter',
     description: 'Upload your internship completion certificate from the company.',
-    bucket: 'internship-completion-letters',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: false
   },
@@ -44,7 +44,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'weekly_report',
     title: 'Weekly Report',
     description: 'Upload your weekly internship progress reports.',
-    bucket: 'internship-weekly-reports',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: false
   },
@@ -52,7 +52,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_outcome',
     title: 'Student Outcome',
     description: 'Upload your student outcome assessment document.',
-    bucket: 'internship-student-outcomes',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: false
   },
@@ -60,7 +60,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_feedback',
     title: 'Student Feedback',
     description: 'Upload your feedback form about the internship experience.',
-    bucket: 'internship-student-feedback',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: false
   },
@@ -68,7 +68,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'company_outcome',
     title: 'Company Outcome',
     description: 'Upload the company outcome report or evaluation.',
-    bucket: 'internship-company-feedback',
+    bucket: 'student-documents', // Using working bucket temporarily
     required: true,
     unlockOthers: false
   }
@@ -152,7 +152,7 @@ export default function StudentInternshipsScreen() {
   const uploadDocument = async (assignmentType: string, bucketName: string, title: string) => {
     if (!user?.id) return;
 
-    console.log(`Attempting to upload ${title} to bucket: ${bucketName}`);
+    console.log(`Attempting to upload ${title} to bucket: ${bucketName} (using student-documents for now)`);
 
     try {
       setUploading(assignmentType);
@@ -175,8 +175,8 @@ export default function StudentInternshipsScreen() {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock upload for development
-        console.log('Demo mode - would upload to bucket:', bucketName);
-        Alert.alert('Demo Mode', `${title} would be uploaded to ${bucketName} (Demo mode)`);
+        console.log('Demo mode - would upload to bucket: student-documents');
+        Alert.alert('Demo Mode', `${title} would be uploaded to student-documents (Demo mode)`);
         
         const mockSubmission: StudentSubmission = {
           id: `mock-${assignmentType}`,
@@ -196,7 +196,9 @@ export default function StudentInternshipsScreen() {
         return;
       }
 
-      console.log('Attempting upload to bucket:', bucketName);
+      // Always use student-documents bucket which we know works
+      const actualBucket = 'student-documents';
+      console.log('Attempting upload to bucket:', actualBucket);
       console.log('File details:', { name: file.name, size: file.size, type: file.mimeType });
 
       // Convert file to blob for upload
@@ -207,7 +209,7 @@ export default function StudentInternshipsScreen() {
 
       // Upload to Supabase storage
       const { error: uploadError } = await supabase.storage
-        .from(bucketName)
+        .from(actualBucket)
         .upload(fileName, blob, {
           contentType: file.mimeType || 'application/pdf',
           upsert: true,
@@ -216,20 +218,20 @@ export default function StudentInternshipsScreen() {
       if (uploadError) {
         console.error('Upload error details:', {
           error: uploadError,
-          bucket: bucketName,
+          bucket: actualBucket,
           fileName: fileName,
           message: uploadError.message
         });
-        Alert.alert('Upload Failed', `Could not upload ${title}.\n\nError: ${uploadError.message}\nBucket: ${bucketName}\nFile: ${fileName}`);
+        Alert.alert('Upload Failed', `Could not upload ${title}.\n\nError: ${uploadError.message}\nBucket: ${actualBucket}\nFile: ${fileName}`);
         setUploading(null);
         return;
       }
 
-      console.log(`Successfully uploaded to bucket: ${bucketName}`);
+      console.log(`Successfully uploaded to bucket: ${actualBucket}`);
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from(bucketName)
+        .from(actualBucket)
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';

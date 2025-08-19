@@ -30,12 +30,12 @@ interface StudentApproval {
 
 // Static assignments configuration matching student side
 const STATIC_ASSIGNMENTS = [
-  { type: 'offer_letter', title: 'Offer Letter', bucket: 'internship-offer-letters' },
-  { type: 'completion_letter', title: 'Completion Letter', bucket: 'internship-completion-letters' },
-  { type: 'weekly_report', title: 'Weekly Report', bucket: 'internship-weekly-reports' },
-  { type: 'student_outcome', title: 'Student Outcome', bucket: 'internship-student-outcomes' },
-  { type: 'student_feedback', title: 'Student Feedback', bucket: 'internship-student-feedback' },
-  { type: 'company_outcome', title: 'Company Outcome', bucket: 'internship-company-feedback' }
+  { type: 'offer_letter', title: 'Offer Letter', bucket: 'student-documents' },
+  { type: 'completion_letter', title: 'Completion Letter', bucket: 'student-documents' },
+  { type: 'weekly_report', title: 'Weekly Report', bucket: 'student-documents' },
+  { type: 'student_outcome', title: 'Student Outcome', bucket: 'student-documents' },
+  { type: 'student_feedback', title: 'Student Feedback', bucket: 'student-documents' },
+  { type: 'company_outcome', title: 'Company Outcome', bucket: 'student-documents' }
 ];
 
 export default function ClassView() {
