@@ -223,7 +223,6 @@ export default function StudentInternshipsScreen() {
       const { error } = await supabase
         .from('student_internship_submissions')
         .upsert({
-          internship_submission_id: null, // We'll handle this differently since we're using static assignments
           student_id: user.id,
           assignment_type: assignmentType,
           file_url: fileUrl,
