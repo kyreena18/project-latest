@@ -175,7 +175,8 @@ export default function StudentInternshipsScreen() {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock upload for development
-        Alert.alert('Success', `${title} uploaded successfully! (Demo mode)`);
+        console.log('Demo mode - would upload to bucket:', bucketName);
+        Alert.alert('Demo Mode', `${title} would be uploaded to ${bucketName} (Demo mode)`);
         
         const mockSubmission: StudentSubmission = {
           id: `mock-${assignmentType}`,
@@ -195,9 +196,14 @@ export default function StudentInternshipsScreen() {
         return;
       }
 
+      console.log('Attempting upload to bucket:', bucketName);
+      console.log('File details:', { name: file.name, size: file.size, type: file.mimeType });
+
       // Convert file to blob for upload
       const response = await fetch(file.uri);
       const blob = await response.blob();
+
+      console.log('Blob created, size:', blob.size);
 
       // Upload to Supabase storage
       const { error: uploadError } = await supabase.storage
@@ -208,10 +214,13 @@ export default function StudentInternshipsScreen() {
         });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
-        console.error('Bucket name:', bucketName);
-        console.error('File name:', fileName);
-        Alert.alert('Upload Failed', `Could not upload ${title}. Error: ${uploadError.message}\nBucket: ${bucketName}`);
+        console.error('Upload error details:', {
+          error: uploadError,
+          bucket: bucketName,
+          fileName: fileName,
+          message: uploadError.message
+        });
+        Alert.alert('Upload Failed', `Could not upload ${title}.\n\nError: ${uploadError.message}\nBucket: ${bucketName}\nFile: ${fileName}`);
         setUploading(null);
         return;
       }
@@ -226,6 +235,12 @@ export default function StudentInternshipsScreen() {
       const fileUrl = urlData?.publicUrl || '';
       console.log('File URL:', fileUrl);
 
+      if (!fileUrl) {
+        Alert.alert('Error', 'Failed to get file URL after upload');
+        setUploading(null);
+        return;
+      }
+
       // Save submission record to database
       const { error } = await supabase
         .from('student_internship_submissions')
@@ -238,10 +253,12 @@ export default function StudentInternshipsScreen() {
         }, { onConflict: 'student_id,assignment_type' });
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('Database save error:', error);
+        Alert.alert('Database Error', `File uploaded but failed to save record: ${error.message}`);
         throw error;
       }
 
+      console.log('Upload successful:', { title, fileUrl });
       Alert.alert('Success', `${title} uploaded successfully!`);
       loadSubmissions();
     } catch (error) {
