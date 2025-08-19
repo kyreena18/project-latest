@@ -28,7 +28,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'offer_letter',
     title: 'Offer Letter',
     description: 'Upload your internship offer letter from the company. This must be approved before other assignments.',
-    bucket: 'student-documents',
+    bucket: 'offer-letters',
     required: true,
     unlockOthers: true
   },
@@ -36,7 +36,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'completion_letter',
     title: 'Completion Letter',
     description: 'Upload your internship completion certificate from the company.',
-    bucket: 'student-documents',
+    bucket: 'completion-letters',
     required: true,
     unlockOthers: false
   },
@@ -44,7 +44,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'weekly_report',
     title: 'Weekly Report',
     description: 'Upload your weekly internship progress reports.',
-    bucket: 'student-documents',
+    bucket: 'weekly-reports',
     required: true,
     unlockOthers: false
   },
@@ -52,7 +52,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_outcome',
     title: 'Student Outcome',
     description: 'Upload your student outcome assessment document.',
-    bucket: 'student-documents',
+    bucket: 'student-outcomes',
     required: true,
     unlockOthers: false
   },
@@ -60,7 +60,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_feedback',
     title: 'Student Feedback',
     description: 'Upload your feedback form about the internship experience.',
-    bucket: 'student-documents',
+    bucket: 'student-feedback',
     required: true,
     unlockOthers: false
   },
@@ -68,7 +68,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'company_outcome',
     title: 'Company Outcome',
     description: 'Upload the company outcome report or evaluation.',
-    bucket: 'student-documents',
+    bucket: 'company-feedback',
     required: true,
     unlockOthers: false
   }
