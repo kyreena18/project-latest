@@ -152,6 +152,8 @@ export default function StudentInternshipsScreen() {
   const uploadDocument = async (assignmentType: string, bucketName: string, title: string) => {
     if (!user?.id) return;
 
+    console.log(`Attempting to upload ${title} to bucket: ${bucketName}`);
+
     try {
       setUploading(assignmentType);
 
@@ -207,10 +209,14 @@ export default function StudentInternshipsScreen() {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        Alert.alert('Upload Failed', `Could not upload ${title}. Error: ${uploadError.message}`);
+        console.error('Bucket name:', bucketName);
+        console.error('File name:', fileName);
+        Alert.alert('Upload Failed', `Could not upload ${title}. Error: ${uploadError.message}\nBucket: ${bucketName}`);
         setUploading(null);
         return;
       }
+
+      console.log(`Successfully uploaded to bucket: ${bucketName}`);
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -218,6 +224,7 @@ export default function StudentInternshipsScreen() {
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';
+      console.log('File URL:', fileUrl);
 
       // Save submission record to database
       const { error } = await supabase
@@ -230,7 +237,10 @@ export default function StudentInternshipsScreen() {
           submitted_at: new Date().toISOString(),
         }, { onConflict: 'student_id,assignment_type' });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database error:', error);
+        throw error;
+      }
 
       Alert.alert('Success', `${title} uploaded successfully!`);
       loadSubmissions();
