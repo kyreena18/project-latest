@@ -102,7 +102,7 @@ export default function ClassView() {
 
         // Load submissions
         const { data: subs, error: subsError } = await supabase
-          .from('student_submissions')
+          .from('student_internship_submissions')
           .select('*')
           .in('student_id', studentIds);
 
@@ -122,7 +122,7 @@ export default function ClassView() {
 
         // Load approvals
         const { data: apps, error: appsError } = await supabase
-          .from('student_approvals')
+          .from('student_internship_approvals')
           .select('*')
           .in('student_id', studentIds);
 
@@ -163,7 +163,7 @@ export default function ClassView() {
   };
 
   const approveOfferLetter = async (studentId: string) => {
-    const offerSubmission = getStudentSubmission(studentId, 'offer_letter');
+    const offerSubmission = submissions[studentId]?.find(sub => sub.assignment_type === 'offer_letter');
     if (!offerSubmission?.file_url) {
       Alert.alert('No Offer Letter', 'This student has not uploaded an offer letter yet.');
       return;
@@ -190,9 +190,9 @@ export default function ClassView() {
     }
     
     try {
-      // Update student_approvals table
+      // Update student_internship_approvals table
       const { error: approvalError } = await supabase
-        .from('student_approvals')
+        .from('student_internship_approvals')
         .upsert({
           student_id: studentId,
           offer_letter_approved: true,
@@ -203,7 +203,7 @@ export default function ClassView() {
 
       // Update submission status
       const { error: submissionError } = await supabase
-        .from('student_submissions')
+        .from('student_internship_submissions')
         .update({ 
           submission_status: 'approved', 
           admin_feedback: 'Offer letter approved - you can now submit other documents' 
@@ -244,9 +244,9 @@ export default function ClassView() {
     }
 
     try {
-      // Update student_approvals table
+      // Update student_internship_approvals table
       const { error: approvalError } = await supabase
-        .from('student_approvals')
+        .from('student_internship_approvals')
         .upsert({
           student_id: profile.student_id,
           credits_awarded: true,

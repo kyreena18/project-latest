@@ -8,6 +8,7 @@ import * as DocumentPicker from 'expo-document-picker';
 
 interface StudentSubmission {
   id: string;
+  student_id: string;
   assignment_type: string;
   file_url: string;
   submission_status: 'submitted' | 'approved' | 'rejected';
@@ -16,6 +17,7 @@ interface StudentSubmission {
 }
 
 interface StudentApproval {
+  student_id: string;
   offer_letter_approved: boolean;
   credits_awarded: boolean;
 }
@@ -26,7 +28,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'offer_letter',
     title: 'Offer Letter',
     description: 'Upload your internship offer letter from the company. This must be approved before other assignments.',
-    bucket: 'offer-letters',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: true
   },
@@ -34,7 +36,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'completion_letter',
     title: 'Completion Letter',
     description: 'Upload your internship completion certificate from the company.',
-    bucket: 'completion-letters',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: false
   },
@@ -42,7 +44,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'weekly_report',
     title: 'Weekly Report',
     description: 'Upload your weekly internship progress reports.',
-    bucket: 'weekly-reports',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: false
   },
@@ -50,7 +52,7 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_outcome',
     title: 'Student Outcome',
     description: 'Upload your student outcome assessment document.',
-    bucket: 'student-outcomes',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: false
   },
@@ -58,15 +60,15 @@ const STATIC_ASSIGNMENTS = [
     type: 'student_feedback',
     title: 'Student Feedback',
     description: 'Upload your feedback form about the internship experience.',
-    bucket: 'student-feedback',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: false
   },
   {
-    type: 'company-feedback',
-    title: 'Company Feedback',
+    type: 'company_outcome',
+    title: 'Company Outcome',
     description: 'Upload the company outcome report or evaluation.',
-    bucket: 'company-feedback',
+    bucket: 'internship-documents',
     required: true,
     unlockOthers: false
   }
@@ -101,7 +103,7 @@ export default function StudentInternshipsScreen() {
       }
 
       const { data, error } = await supabase
-        .from('student_submissions')
+        .from('student_internship_submissions')
         .select('*')
         .eq('student_id', user.id);
 
@@ -130,7 +132,7 @@ export default function StudentInternshipsScreen() {
       }
 
       const { data, error } = await supabase
-        .from('student_approvals')
+        .from('student_internship_approvals')
         .select('offer_letter_approved, credits_awarded')
         .eq('student_id', user.id)
         .maybeSingle();
@@ -175,6 +177,7 @@ export default function StudentInternshipsScreen() {
         
         const mockSubmission: StudentSubmission = {
           id: `mock-${assignmentType}`,
+          student_id: user.id,
           assignment_type: assignmentType,
           file_url: `https://example.com/mock-${assignmentType}.pdf`,
           submission_status: 'submitted',
@@ -190,9 +193,11 @@ export default function StudentInternshipsScreen() {
         return;
       }
 
+      // Convert file to blob for upload
       const response = await fetch(file.uri);
       const blob = await response.blob();
 
+      // Upload to Supabase storage
       const { error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(fileName, blob, {
@@ -202,20 +207,23 @@ export default function StudentInternshipsScreen() {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        Alert.alert('Upload Failed', `Could not upload ${title}.`);
+        Alert.alert('Upload Failed', `Could not upload ${title}. Error: ${uploadError.message}`);
         setUploading(null);
         return;
       }
 
+      // Get public URL
       const { data: urlData } = supabase.storage
         .from(bucketName)
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';
 
+      // Save submission record to database
       const { error } = await supabase
-        .from('student_submissions')
+        .from('student_internship_submissions')
         .upsert({
+          internship_submission_id: null, // We'll handle this differently since we're using static assignments
           student_id: user.id,
           assignment_type: assignmentType,
           file_url: fileUrl,
