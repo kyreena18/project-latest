@@ -156,7 +156,11 @@ export default function ClassView() {
       return;
     }
     try {
-      await Linking.openURL(submission.file_url);
+      // Force the URL to open in browser for viewing instead of downloading
+      const viewUrl = submission.file_url.includes('?') 
+        ? `${submission.file_url}&view=true` 
+        : `${submission.file_url}?view=true`;
+      await Linking.openURL(viewUrl);
     } catch (error) {
       Alert.alert('Error', `Failed to open ${title}.`);
     }
