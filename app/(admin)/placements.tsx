@@ -297,17 +297,8 @@ export default function AdminPlacementsScreen() {
     }
 
     try {
-      // Build requirement types to export: prefer configured list; fallback to types found in submissions
-      const configuredTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
-      const fallbackTypesSet = new Set<string>();
-      if (configuredTypes.length === 0) {
-        applications.forEach(app => {
-          app.student_requirement_submissions?.forEach(sub => {
-            if (sub?.placement_requirements?.type) fallbackTypesSet.add(sub.placement_requirements.type);
-          });
-        });
-      }
-      const requirementTypes = configuredTypes.length > 0 ? configuredTypes : Array.from(fallbackTypesSet);
+      // Get all additional requirement types from the selected event
+      const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
 
       const exportData = applications.map((application, index) => ({
         'S.No': index + 1,
@@ -322,14 +313,14 @@ export default function AdminPlacementsScreen() {
         'Resume Link': application.students?.student_profiles?.resume_url 
           ? `=HYPERLINK("${application.students.student_profiles.resume_url}","View Resume")`
           : 'Not uploaded',
-        // Add requirement submission links
-        ...requirementTypes.reduce((acc, type) => {
+        // Add additional requirement submission links
+        ...additionalRequirementTypes.reduce((acc, type) => {
           const reqLabel = type.replace('_', ' ').split(' ').map(word => 
             word.charAt(0).toUpperCase() + word.slice(1)
           ).join(' ');
           const reqKey = `${reqLabel} Link`;
           
-          // Find the submission for this requirement type
+          // Find the submission for this additional requirement type
           const submission = application.student_requirement_submissions?.find(sub => 
             sub.placement_requirements.type === type
           );
@@ -355,9 +346,10 @@ export default function AdminPlacementsScreen() {
         { wch: 8 },   // Class
         { wch: 15 },  // Application Status
         { wch: 12 },  // Applied Date
+        { wch: 15 },  // Admin Notes
         { wch: 15 },  // Resume Link
-        // Add column widths for additional requirements
-        ...Array(requirementTypes.length).fill({ wch: 18 }),
+        // Add column widths for additional requirement links
+        ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
       ];
       ws['!cols'] = colWidths;
 
