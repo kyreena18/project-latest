@@ -169,14 +169,6 @@ export default function ClassView() {
       return;
     }
 
-    // First view the offer letter
-    try {
-      await Linking.openURL(offerSubmission.file_url);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to open offer letter.');
-      return;
-    }
-    
     // Check if Supabase is configured
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
@@ -189,6 +181,37 @@ export default function ClassView() {
       return;
     }
     
+    // Show confirmation dialog before approving
+    Alert.alert(
+      'Approve Offer Letter',
+      'Are you sure you want to approve this student\'s offer letter? This will unlock all other assignment submissions for them.',
+      [
+        {
+          text: 'View First',
+          onPress: async () => {
+            try {
+              await Linking.openURL(offerSubmission.file_url);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to open offer letter.');
+            }
+          }
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Approve',
+          style: 'default',
+          onPress: async () => {
+            await performApproval(studentId);
+          }
+        }
+      ]
+    );
+  };
+
+  const performApproval = async (studentId: string) => {
     try {
       // Update student_internship_approvals table
       const { error: approvalError } = await supabase
@@ -398,7 +421,7 @@ export default function ClassView() {
                     onPress={() => approveOfferLetter(profile.student_id)}
                   >
                     <Text style={styles.actionButtonText}>
-                      {isApproved ? 'View Offer Letter' : 'Approve Offer Letter'}
+                      {isApproved ? 'Approved ✓' : 'Approve Offer Letter'}
                     </Text>
                   </TouchableOpacity>
 
