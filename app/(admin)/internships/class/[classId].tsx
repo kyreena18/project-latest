@@ -213,8 +213,6 @@ export default function ClassView() {
 
   const performApproval = async (studentId: string) => {
     try {
-      console.log('Starting approval process for student:', studentId);
-      
       // Update student_internship_approvals table
       const { error: approvalError } = await supabase
         .from('student_internship_approvals')
@@ -222,15 +220,11 @@ export default function ClassView() {
           student_id: studentId,
           offer_letter_approved: true,
           approved_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         }, { onConflict: 'student_id' });
 
       if (approvalError) {
-        console.error('Approval error:', approvalError);
         throw approvalError;
       }
-      
-      console.log('Approval record updated successfully');
 
       // Update submission status
       const { error: submissionError } = await supabase
@@ -238,17 +232,12 @@ export default function ClassView() {
         .update({ 
           submission_status: 'approved', 
           admin_feedback: 'Offer letter approved - you can now submit other documents',
-          reviewed_at: new Date().toISOString(),
         })
         .eq('student_id', studentId)
         .eq('assignment_type', 'offer_letter');
 
       if (submissionError) {
         console.error('Submission update error:', submissionError);
-        // Don't throw here as the approval was successful, just log the error
-        console.warn('Failed to update submission status, but approval was recorded');
-      } else {
-        console.log('Submission status updated successfully');
       }
       
       // Update local state
@@ -261,15 +250,12 @@ export default function ClassView() {
         }
       }));
 
-      // Reload data to reflect changes
-      setTimeout(() => {
-        loadData();
-      }, 500);
+      loadData();
       
       Alert.alert('Approved', 'Student offer letter approved. They can now submit other documents.');
     } catch (err) {
       console.error('Approval error:', err);
-      Alert.alert('Error', `Failed to approve student offer letter: ${err.message || 'Unknown error'}`);
+      Alert.alert('Error', 'Failed to approve student offer letter.');
     }
   };
 
