@@ -163,57 +163,19 @@ export default function ClassView() {
   };
 
   const approveOfferLetter = async (studentId: string) => {
-    const offerSubmission = submissions[studentId]?.find(sub => sub.assignment_type === 'offer_letter');
-    if (!offerSubmission?.file_url) {
-      Alert.alert('No Offer Letter', 'This student has not uploaded an offer letter yet.');
-      return;
-    }
-
-    // Check if Supabase is configured
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
-      // Mock approval for development
-      setApprovals(prev => ({
-        ...prev,
-        [studentId]: { student_id: studentId, offer_letter_approved: true, credits_awarded: false }
-      }));
-      Alert.alert('Approved', 'Student offer letter approved. They can now submit other documents.');
-      return;
-    }
-    
-    // Show confirmation dialog before approving
-    Alert.alert(
-      'Approve Offer Letter',
-      'Are you sure you want to approve this student\'s offer letter? This will unlock all other assignment submissions for them.',
-      [
-        {
-          text: 'View First',
-          onPress: async () => {
-            try {
-              await Linking.openURL(offerSubmission.file_url);
-            } catch (error) {
-              Alert.alert('Error', 'Failed to open offer letter.');
-            }
-          }
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel'
-        },
-        {
-          text: 'Approve',
-          style: 'default',
-          onPress: async () => {
-            await performApproval(studentId);
-          }
-        }
-      ]
-    );
-  };
-
-  const performApproval = async (studentId: string) => {
     try {
-      // Update student_internship_approvals table
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
+        // Mock approval for development
+        setApprovals(prev => ({
+          ...prev,
+          [studentId]: { student_id: studentId, offer_letter_approved: true, credits_awarded: false }
+        }));
+        Alert.alert('Approved', 'Student offer letter approved. They can now submit other documents.');
+        return;
+      }
+
       const { error: approvalError } = await supabase
         .from('student_internship_approvals')
         .upsert({
@@ -222,25 +184,19 @@ export default function ClassView() {
           approved_at: new Date().toISOString(),
         }, { onConflict: 'student_id' });
 
-      if (approvalError) {
-        throw approvalError;
-      }
+      if (approvalError) throw approvalError;
 
-      // Update submission status
       const { error: submissionError } = await supabase
         .from('student_internship_submissions')
         .update({ 
           submission_status: 'approved', 
-          admin_feedback: 'Offer letter approved - you can now submit other documents',
+          admin_feedback: 'Offer letter approved - you can now submit other documents'
         })
         .eq('student_id', studentId)
         .eq('assignment_type', 'offer_letter');
 
-      if (submissionError) {
-        console.error('Submission update error:', submissionError);
-      }
-      
-      // Update local state
+      if (submissionError) console.error('Submission update error:', submissionError);
+
       setApprovals(prev => ({
         ...prev,
         [studentId]: { 
@@ -251,10 +207,9 @@ export default function ClassView() {
       }));
 
       loadData();
-      
       Alert.alert('Approved', 'Student offer letter approved. They can now submit other documents.');
-    } catch (err) {
-      console.error('Approval error:', err);
+    } catch (error) {
+      console.error('Approval error:', error);
       Alert.alert('Error', 'Failed to approve student offer letter.');
     }
   };

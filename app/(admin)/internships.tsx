@@ -29,36 +29,13 @@ export default function AdminInternshipsScreen() {
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock data for development
-        const mockStats: ClassStats[] = [
-          {
-            className: 'TYIT',
-            displayName: 'Third Year IT',
-            description: 'Information Technology - Final Year',
-            studentCount: 25,
-            color: '#007AFF'
-          },
-          {
-            className: 'TYSD',
-            displayName: 'Third Year Software Development',
-            description: 'Software Development - Final Year',
-            studentCount: 22,
-            color: '#34C759'
-          },
-          {
-            className: 'SYIT',
-            displayName: 'Second Year IT',
-            description: 'Information Technology - Second Year',
-            studentCount: 28,
-            color: '#FF9500'
-          },
-          {
-            className: 'SYSD',
-            displayName: 'Second Year Software Development',
-            description: 'Software Development - Second Year',
-            studentCount: 24,
-            color: '#AF52DE'
-          }
+        const classDefinitions = [
+          { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
+          { className: 'TYSD', displayName: 'Third Year Software Development', description: 'Software Development - Final Year', color: '#34C759' },
+          { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
+          { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
         ];
+        const mockStats = classDefinitions.map(def => ({ ...def, studentCount: def.className.startsWith('TY') ? 25 : 22 }));
         
         setClassStats(mockStats);
         setTotalStudents(mockStats.reduce((sum, cls) => sum + cls.studentCount, 0));
@@ -82,30 +59,10 @@ export default function AdminInternshipsScreen() {
       }, {});
 
       const classDefinitions = [
-        {
-          className: 'TYIT',
-          displayName: 'Third Year IT',
-          description: 'Information Technology - Final Year',
-          color: '#007AFF'
-        },
-        {
-          className: 'TYSD',
-          displayName: 'Third Year Software Development',
-          description: 'Software Development - Final Year',
-          color: '#34C759'
-        },
-        {
-          className: 'SYIT',
-          displayName: 'Second Year IT',
-          description: 'Information Technology - Second Year',
-          color: '#FF9500'
-        },
-        {
-          className: 'SYSD',
-          displayName: 'Second Year Software Development',
-          description: 'Software Development - Second Year',
-          color: '#AF52DE'
-        }
+        { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
+        { className: 'TYSD', displayName: 'Third Year Software Development', description: 'Software Development - Final Year', color: '#34C759' },
+        { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
+        { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
       ];
 
       const statsWithCounts = classDefinitions.map(classDef => ({
