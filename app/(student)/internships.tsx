@@ -86,6 +86,28 @@ export default function StudentInternshipsScreen() {
     if (user?.id) {
       loadSubmissions();
       loadApprovalStatus();
+      
+      // Set up real-time subscription for approval status changes
+      const approvalChannel = supabase
+        .channel('approval-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'student_internship_approvals',
+            filter: `student_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('Approval status changed:', payload);
+            loadApprovalStatus();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        approvalChannel.unsubscribe();
+      };
     }
   }, [user]);
 
