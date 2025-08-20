@@ -131,6 +131,25 @@ export default function StudentInternshipsScreen() {
         return;
       }
 
+      // First check if student has an offer letter submission
+      const { data: offerLetterSub } = await supabase
+        .from('student_internship_submissions')
+        .select('id')
+        .eq('student_id', user.id)
+        .eq('assignment_type', 'offer_letter')
+        .maybeSingle();
+
+      // If no offer letter, reset approval status
+      if (!offerLetterSub) {
+        await supabase
+          .from('student_internship_approvals')
+          .update({ offer_letter_approved: false })
+          .eq('student_id', user.id);
+        
+        setApproval({ offer_letter_approved: false, credits_awarded: false });
+        return;
+      }
+
       const { data, error } = await supabase
         .from('student_internship_approvals')
         .select('offer_letter_approved, credits_awarded')

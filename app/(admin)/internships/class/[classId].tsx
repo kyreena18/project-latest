@@ -118,6 +118,24 @@ export default function ClassView() {
             submissionsByStudent[sub.student_id].push(sub);
           });
           setSubmissions(submissionsByStudent);
+
+          // Check for students who had approval but no longer have offer letter
+          const studentsWithOfferLetter = new Set();
+          (subs || []).forEach(sub => {
+            if (sub.assignment_type === 'offer_letter') {
+              studentsWithOfferLetter.add(sub.student_id);
+            }
+          });
+
+          // Reset approval for students without offer letter
+          for (const studentId of studentIds) {
+            if (!studentsWithOfferLetter.has(studentId)) {
+              await supabase
+                .from('student_internship_approvals')
+                .update({ offer_letter_approved: false })
+                .eq('student_id', studentId);
+            }
+          }
         }
 
         // Load approvals
@@ -134,6 +152,27 @@ export default function ClassView() {
           (apps || []).forEach(app => {
             approvalsByStudent[app.student_id] = app;
           });
+
+          // Filter out approvals for students without offer letters
+          const submissionsByStudent = {};
+          (subs || []).forEach(sub => {
+            if (!submissionsByStudent[sub.student_id]) {
+              submissionsByStudent[sub.student_id] = [];
+            }
+            submissionsByStudent[sub.student_id].push(sub);
+          });
+
+          Object.keys(approvalsByStudent).forEach(studentId => {
+            const studentSubs = submissionsByStudent[studentId] || [];
+            const hasOfferLetter = studentSubs.some(sub => sub.assignment_type === 'offer_letter');
+            if (!hasOfferLetter) {
+              approvalsByStudent[studentId] = {
+                ...approvalsByStudent[studentId],
+                offer_letter_approved: false
+              };
+            }
+          });
+
           setApprovals(approvalsByStudent);
         }
       }
