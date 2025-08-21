@@ -136,6 +136,24 @@ export default function ClassView() {
                 .eq('student_id', studentId);
             }
           }
+
+          // Check for students who should have credits reset
+          const studentsEligibleForCredits = new Set();
+          (subs || []).forEach(sub => {
+            if (sub.assignment_type === 'completion_letter' && sub.submission_status === 'approved') {
+              studentsEligibleForCredits.add(sub.student_id);
+            }
+          });
+
+          // Reset credits for students without approved completion letter
+          for (const studentId of studentIds) {
+            if (!studentsEligibleForCredits.has(studentId)) {
+              await supabase
+                .from('student_internship_approvals')
+                .update({ credits_awarded: false })
+                .eq('student_id', studentId);
+            }
+          }
         }
 
         // Load approvals
@@ -165,10 +183,21 @@ export default function ClassView() {
           Object.keys(approvalsByStudent).forEach(studentId => {
             const studentSubs = submissionsByStudent[studentId] || [];
             const hasOfferLetter = studentSubs.some(sub => sub.assignment_type === 'offer_letter');
+            const hasApprovedCompletionLetter = studentSubs.some(sub => 
+              sub.assignment_type === 'completion_letter' && sub.submission_status === 'approved'
+            );
+            
             if (!hasOfferLetter) {
               approvalsByStudent[studentId] = {
                 ...approvalsByStudent[studentId],
                 offer_letter_approved: false
+              };
+            }
+            
+            if (!hasApprovedCompletionLetter) {
+              approvalsByStudent[studentId] = {
+                ...approvalsByStudent[studentId],
+                credits_awarded: false
               };
             }
           });
@@ -439,11 +468,16 @@ export default function ClassView() {
                       creditsAwarded && styles.awardedButton
                     ]}
                     onPress={() => awardCredits(profile)}
-                    disabled={creditsAwarded}
+                    disabled={creditsAwarded || !getStudentSubmission(profile.student_id, 'completion_letter')}
                   >
                     <Award size={16} color="#FFFFFF" />
                     <Text style={styles.actionButtonText}>
-                      {creditsAwarded ? 'Credits Awarded ✓' : 'Award 2 Credits'}
+                      {creditsAwarded 
+                        ? 'Credits Awarded ✓' 
+                        : !getStudentSubmission(profile.student_id, 'completion_letter')
+                        ? 'No Completion Letter'
+                        : 'Award 2 Credits'
+                      }
                     </Text>
                   </TouchableOpacity>
                 </View>
