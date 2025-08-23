@@ -87,7 +87,7 @@ export default function PlacementsScreen() {
       const blob = await response.blob();
 
       const { error: uploadError } = await supabase.storage
-        .from('placement-offers')
+        .from('placement-offer-letters')
         .upload(fileName, blob, {
           contentType: file.mimeType || 'application/pdf',
           upsert: true,
@@ -102,7 +102,7 @@ export default function PlacementsScreen() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('placement-offers')
+        .from('placement-offer-letters')
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';
