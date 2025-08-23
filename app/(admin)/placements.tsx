@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Briefcase, Eye, X, User, Download } from 'lucide-react-native';
+import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
@@ -313,11 +313,9 @@ export default function AdminPlacementsScreen() {
         'Resume Link': application.students?.student_profiles?.resume_url 
           ? `=HYPERLINK("${application.students.student_profiles.resume_url}","View Resume")`
           : 'Not uploaded',
-        'Offer Letter': application.application_status === 'accepted' 
-          ? (application.offer_letter_url 
-              ? `=HYPERLINK("${application.offer_letter_url}","View Offer Letter")`
-              : 'Not uploaded')
-          : 'Not accepted',
+        'Offer Letter Link': application.offer_letter_url 
+          ? `=HYPERLINK("${application.offer_letter_url}","View Offer Letter")`
+          : (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
         // Add additional requirement submission links
         ...additionalRequirementTypes.reduce((acc, type) => {
           const reqLabel = type.replace('_', ' ').split(' ').map(word => 
@@ -353,7 +351,7 @@ export default function AdminPlacementsScreen() {
         { wch: 12 },  // Applied Date
         { wch: 15 },  // Admin Notes
         { wch: 15 },  // Resume Link
-        { wch: 18 },  // Offer Letter
+        { wch: 18 },  // Offer Letter Link
         // Add column widths for additional requirement links
         ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
       ];
