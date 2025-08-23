@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 import { Briefcase, Calendar, Building, Users, FileText, Upload, X, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Bell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
