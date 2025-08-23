@@ -685,8 +685,14 @@ export default function AdminPlacementsScreen() {
                       <TouchableOpacity
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
-                          if (application.offer_letter_url) {
-                            window.open(application.offer_letter_url, '_blank');
+                          try {
+                            // Force the URL to open in browser for viewing instead of downloading
+                            const viewUrl = application.offer_letter_url.includes('?') 
+                              ? `${application.offer_letter_url}&view=true` 
+                              : `${application.offer_letter_url}?view=true`;
+                            window.open(viewUrl, '_blank');
+                          } catch (error) {
+                            Alert.alert('Error', 'Failed to open offer letter.');
                           }
                         }}
                       >
