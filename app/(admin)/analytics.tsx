@@ -167,33 +167,93 @@ export default function AnalyticsScreen() {
       });
 
       applications.forEach(app => {
-        // Get student class from applications
-        const studentClass = 'TYIT'; // This would need to be joined properly
+        .from('student_profiles')
+        .select('id, class, student_id');
         if (classStats[studentClass]) {
           classStats[studentClass].applied++;
           if (app.application_status === 'accepted') {
             classStats[studentClass].accepted++;
           }
         }
-      });
+        .select('id, company_name, is_active, created_at');
 
       const classWiseStats: ClassStats[] = Object.entries(classStats).map(([className, data]) => ({
         class: className,
         total_students: data.total,
         applied_students: data.applied,
         accepted_students: data.accepted
-      }));
+        .select(`
+          id, 
+          application_status, 
+          applied_at,
+          placement_events (company_name),
+          students (
+            student_profiles (class)
+          )
+        `);
 
       const totalApplications = applications.length;
       const totalAccepted = applications.filter(app => app.application_status === 'accepted').length;
+      // Process data for visualizations
+      const applicationsByCompany: { [key: string]: number } = {};
+      const applicationsByStatus: { [key: string]: number } = {};
+      const applicationsByClass: { [key: string]: number } = {};
+      const placementsByMonth: { [key: string]: number } = {};
+      const companyStats: { [key: string]: { applications: number; accepted: number } } = {};
+
+      (applicationsData || []).forEach((app: any) => {
+        const companyName = app.placement_events?.company_name || 'Unknown';
+        const status = app.application_status || 'pending';
+        const studentClass = app.students?.student_profiles?.class || 'Unknown';
+        const month = new Date(app.applied_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+
+        // Count by company
+        applicationsByCompany[companyName] = (applicationsByCompany[companyName] || 0) + 1;
+        
+        // Count by status
+        applicationsByStatus[status] = (applicationsByStatus[status] || 0) + 1;
+        
+        // Count by class
+        applicationsByClass[studentClass] = (applicationsByClass[studentClass] || 0) + 1;
+        
+        // Count by month
+        placementsByMonth[month] = (placementsByMonth[month] || 0) + 1;
+
+        // Company stats for top companies
+        if (!companyStats[companyName]) {
+          companyStats[companyName] = { applications: 0, accepted: 0 };
+        }
+        companyStats[companyName].applications++;
+        if (status === 'accepted') {
+          companyStats[companyName].accepted++;
+        }
+      });
+
+      // Calculate top companies
+      const topCompanies = Object.entries(companyStats)
+        .map(([name, stats]) => ({ name, ...stats }))
+        .sort((a, b) => b.applications - a.applications)
+        .slice(0, 5);
+
+      // Calculate acceptance rate
+      const totalApplications = applicationsData?.length || 0;
+      const acceptedCount = (applicationsData || []).filter((app: any) => app.application_status === 'accepted').length;
+      const acceptanceRate = totalApplications > 0 ? (acceptedCount / totalApplications) * 100 : 0;
+
 
       setStats({
         totalCompanies: new Set(companies.map(c => c.company_name)).size,
         totalApplications,
         totalAccepted,
-        acceptanceRate: totalApplications > 0 ? (totalAccepted / totalApplications) * 100 : 0,
+        acceptedApplications: acceptedCount,
         companiesData,
         classWiseStats
+        applicationsByCompany,
+        applicationsByStatus,
+        applicationsByClass,
+        placementsByMonth,
+        acceptanceRate,
+        topCompanies,
       });
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -216,8 +276,8 @@ export default function AnalyticsScreen() {
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Placement Analytics</Text>
-        <View style={styles.headerStats}>
-          <Text style={styles.headerStatsText}>2024-25</Text>
+        <TouchableOpacity style={styles.downloadButton} onPress={generateReport}>
+          <Text style={styles.downloadButtonText}>Download Report</Text>
         </View>
       </View>
 
