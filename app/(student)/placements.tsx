@@ -926,6 +926,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B6B6B',
     fontStyle: 'italic',
+    marginBottom: 12,
+  },
+  offerLetterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#34C759',
+    borderRadius: 8,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  offerLetterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   applyButton: {
     flexDirection: 'row',

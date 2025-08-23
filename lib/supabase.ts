@@ -197,6 +197,7 @@ export type Database = {
           application_status?: string;
           applied_at?: string;
           admin_notes?: string;
+          offer_letter_url?: string;
         };
       };
       student_requirement_submissions: {

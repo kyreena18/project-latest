@@ -1090,6 +1090,24 @@ const styles = StyleSheet.create({
   appliedDate: {
     fontSize: 12,
     color: '#6B6B6B',
+    marginBottom: 8,
+  },
+  viewOfferLetterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FFF4',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+    gap: 8,
+  },
+  viewOfferLetterText: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
   },
   acceptButton: {
     marginTop: 8,
