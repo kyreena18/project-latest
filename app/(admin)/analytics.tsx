@@ -451,6 +451,56 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  classOverview: {
+    marginBottom: 20,
+  },
+  classOverviewGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  classOverviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    width: '48%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  classOverviewTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  classOverviewTotal: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 2,
+  },
+  classOverviewLabel: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    marginBottom: 8,
+  },
+  classOverviewPlaced: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#34C759',
+    marginBottom: 2,
+  },
+  classOverviewRate: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',

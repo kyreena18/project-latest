@@ -684,7 +684,11 @@ export default function AdminPlacementsScreen() {
                     {application.application_status === 'accepted' && application.offer_letter_url && (
                       <TouchableOpacity
                         style={styles.viewOfferLetterButton}
-                        onPress={() => Linking.openURL(application.offer_letter_url!)}
+                        onPress={() => {
+                          if (application.offer_letter_url) {
+                            window.open(application.offer_letter_url, '_blank');
+                          }
+                        }}
                       >
                         <FileText size={16} color="#34C759" />
                         <Text style={styles.viewOfferLetterText}>View Offer Letter</Text>
