@@ -202,6 +202,10 @@ export default function AnalyticsScreen() {
     }
   };
 
+  const generateReport = () => {
+    // Report generation logic
+  };
+
   if (loading) {
     return (
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
@@ -216,9 +220,9 @@ export default function AnalyticsScreen() {
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Placement Analytics</Text>
-        <View style={styles.headerStats}>
-          <Text style={styles.headerStatsText}>2024-25</Text>
-        </View>
+        <TouchableOpacity style={styles.downloadButton} onPress={generateReport}>
+          <Text style={styles.downloadButtonText}>Download Report</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -332,6 +336,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  downloadButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  downloadButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   headerStats: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -468,5 +483,113 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     marginLeft: 8,
+  },
+  chartsSection: {
+    marginTop: 24,
+  },
+  chartCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  chartTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  acceptanceRateCard: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#34C759',
+  },
+  acceptanceRateHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  acceptanceRateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#34C759',
+    marginLeft: 8,
+  },
+  acceptanceRateValue: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#34C759',
+    marginBottom: 8,
+  },
+  acceptanceRateSubtext: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    textAlign: 'center',
+  },
+  topCompaniesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  companyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  companyRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  rankNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  companyInfo: {
+    flex: 1,
+  },
+  companyName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 2,
+  },
+  companyStats: {
+    fontSize: 14,
+    color: '#6B6B6B',
+  },
+  companyRate: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  rateText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });
