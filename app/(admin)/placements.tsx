@@ -313,6 +313,11 @@ export default function AdminPlacementsScreen() {
         'Resume Link': application.students?.student_profiles?.resume_url 
           ? `=HYPERLINK("${application.students.student_profiles.resume_url}","View Resume")`
           : 'Not uploaded',
+        'Offer Letter': application.application_status === 'accepted' 
+          ? (application.offer_letter_url 
+              ? `=HYPERLINK("${application.offer_letter_url}","View Offer Letter")`
+              : 'Not uploaded')
+          : 'Not accepted',
         // Add additional requirement submission links
         ...additionalRequirementTypes.reduce((acc, type) => {
           const reqLabel = type.replace('_', ' ').split(' ').map(word => 
@@ -348,6 +353,7 @@ export default function AdminPlacementsScreen() {
         { wch: 12 },  // Applied Date
         { wch: 15 },  // Admin Notes
         { wch: 15 },  // Resume Link
+        { wch: 18 },  // Offer Letter
         // Add column widths for additional requirement links
         ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
       ];
@@ -675,6 +681,17 @@ export default function AdminPlacementsScreen() {
                       </View>
                     </View>
                     <Text style={styles.appliedDate}>Applied: {formatDate(application.applied_at)}</Text>
+
+                    {/* View Offer Letter Button for Accepted Students */}
+                    {application.application_status === 'accepted' && application.offer_letter_url && (
+                      <TouchableOpacity
+                        style={styles.viewOfferLetterButton}
+                        onPress={() => Linking.openURL(application.offer_letter_url!)}
+                      >
+                        <FileText size={16} color="#34C759" />
+                        <Text style={styles.viewOfferLetterText}>View Offer Letter</Text>
+                      </TouchableOpacity>
+                    )}
 
                     {application.application_status !== 'accepted' && (
                       <TouchableOpacity

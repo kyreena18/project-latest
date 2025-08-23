@@ -53,6 +53,83 @@ export default function PlacementsScreen() {
   const [requirementUrls, setRequirementUrls] = useState<{ [key: string]: string }>({});
   const [unreadNotifications, setUnreadNotifications] = useState(0);
 
+  const uploadOfferLetter = async (eventId: string, applicationId: string) => {
+    if (!user?.id) return;
+
+    try {
+      setUploading(`offer_${applicationId}`);
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) {
+        setUploading(null);
+        return;
+      }
+
+      const file = result.assets[0];
+      const fileExtension = file.name.split('.').pop() || 'pdf';
+      const fileName = `${user.id}_offer_letter_${Date.now()}.${fileExtension}`;
+
+      // Check if Supabase is configured
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
+        // Mock upload for development
+        Alert.alert('Demo Mode', 'Offer letter would be uploaded (Demo mode)');
+        setUploading(null);
+        return;
+      }
+
+      // Upload to placement-offers bucket
+      const response = await fetch(file.uri);
+      const blob = await response.blob();
+
+      const { error: uploadError } = await supabase.storage
+        .from('placement-offers')
+        .upload(fileName, blob, {
+          contentType: file.mimeType || 'application/pdf',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        Alert.alert('Upload Failed', 'Could not upload offer letter.');
+        setUploading(null);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('placement-offers')
+        .getPublicUrl(fileName);
+
+      const fileUrl = urlData?.publicUrl || '';
+
+      // Update application with offer letter URL
+      const { error } = await supabase
+        .from('placement_applications')
+        .update({ offer_letter_url: fileUrl })
+        .eq('id', applicationId);
+
+      if (error) {
+        console.error('Database update error:', error);
+        Alert.alert('Error', 'Failed to save offer letter URL.');
+        setUploading(null);
+        return;
+      }
+
+      Alert.alert('Success', 'Offer letter uploaded successfully!');
+      loadMyApplications(); // Refresh applications to show updated status
+    } catch (error) {
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Failed to upload offer letter. Please try again.');
+    } finally {
+      setUploading(null);
+    }
+  };
+
   useEffect(() => {
     const initializeData = async () => {
       await loadStudentClass();
@@ -575,6 +652,38 @@ export default function PlacementsScreen() {
                     </TouchableOpacity>
                   )}
 
+                  {/* Offer Letter Upload for Accepted Students */}
+                  {application && application.application_status === 'accepted' && (
+                    <View style={styles.offerLetterSection}>
+                      <Text style={styles.offerLetterTitle}>🎉 Congratulations! You've been accepted!</Text>
+                      {application.offer_letter_url ? (
+                        <View style={styles.offerLetterUploaded}>
+                          <Text style={styles.offerLetterUploadedText}>✅ Offer letter uploaded successfully</Text>
+                          <TouchableOpacity
+                            style={styles.reuploadOfferButton}
+                            onPress={() => uploadOfferLetter(event.id, application.id)}
+                            disabled={uploading === `offer_${application.id}`}
+                          >
+                            <Upload size={16} color="#007AFF" />
+                            <Text style={styles.reuploadOfferText}>
+                              {uploading === `offer_${application.id}` ? 'Updating...' : 'Update Offer Letter'}
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.uploadOfferButton, uploading === `offer_${application.id}` && styles.disabledButton]}
+                          onPress={() => uploadOfferLetter(event.id, application.id)}
+                          disabled={uploading === `offer_${application.id}`}
+                        >
+                          <Upload size={20} color="#FFFFFF" />
+                          <Text style={styles.uploadOfferButtonText}>
+                            {uploading === `offer_${application.id}` ? 'Uploading...' : 'Upload Offer Letter'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                   {application ? (
                     <View style={styles.appliedSection}>
                       <Text style={styles.appliedText}>
@@ -1083,5 +1192,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600',
+  },
+  offerLetterSection: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 2,
+    borderColor: '#34C759',
+  },
+  offerLetterTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#34C759',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  offerLetterUploaded: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  offerLetterUploadedText: {
+    fontSize: 14,
+    color: '#34C759',
+    fontWeight: '600',
+  },
+  reuploadOfferButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  reuploadOfferText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  uploadOfferButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#34C759',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  uploadOfferButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

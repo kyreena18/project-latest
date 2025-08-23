@@ -40,6 +40,47 @@ export default function AnalyticsScreen() {
 
   useEffect(() => {
     loadAnalyticsData();
+    
+    // Set up real-time subscriptions for dynamic updates
+    const setupRealtimeSubscriptions = () => {
+      const applicationsChannel = supabase
+        .channel('analytics-applications-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'placement_applications',
+          },
+          () => {
+            loadAnalyticsData();
+          }
+        )
+        .subscribe();
+
+      const eventsChannel = supabase
+        .channel('analytics-events-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'placement_events',
+          },
+          () => {
+            loadAnalyticsData();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        applicationsChannel.unsubscribe();
+        eventsChannel.unsubscribe();
+      };
+    };
+
+    const cleanup = setupRealtimeSubscriptions();
+    return cleanup;
   }, []);
 
   const loadAnalyticsData = async () => {
