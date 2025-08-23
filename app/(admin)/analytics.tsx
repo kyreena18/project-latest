@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BarChart3, Users, Building, TrendingUp, Award } from 'lucide-react-native';
+import { ChartBar as BarChart3, Users, Building, TrendingUp, Award } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
 interface PlacementStats {
