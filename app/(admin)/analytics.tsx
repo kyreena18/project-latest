@@ -167,93 +167,33 @@ export default function AnalyticsScreen() {
       });
 
       applications.forEach(app => {
-        .from('student_profiles')
-        .select('id, class, student_id');
+        const studentClass = app.students?.student_profiles?.class;
         if (classStats[studentClass]) {
           classStats[studentClass].applied++;
           if (app.application_status === 'accepted') {
             classStats[studentClass].accepted++;
           }
         }
-        .select('id, company_name, is_active, created_at');
+      });
 
       const classWiseStats: ClassStats[] = Object.entries(classStats).map(([className, data]) => ({
         class: className,
         total_students: data.total,
         applied_students: data.applied,
         accepted_students: data.accepted
-        .select(`
-          id, 
-          application_status, 
-          applied_at,
-          placement_events (company_name),
-          students (
-            student_profiles (class)
-          )
-        `);
+      }));
 
       const totalApplications = applications.length;
       const totalAccepted = applications.filter(app => app.application_status === 'accepted').length;
-      // Process data for visualizations
-      const applicationsByCompany: { [key: string]: number } = {};
-      const applicationsByStatus: { [key: string]: number } = {};
-      const applicationsByClass: { [key: string]: number } = {};
-      const placementsByMonth: { [key: string]: number } = {};
-      const companyStats: { [key: string]: { applications: number; accepted: number } } = {};
-
-      (applicationsData || []).forEach((app: any) => {
-        const companyName = app.placement_events?.company_name || 'Unknown';
-        const status = app.application_status || 'pending';
-        const studentClass = app.students?.student_profiles?.class || 'Unknown';
-        const month = new Date(app.applied_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
-        // Count by company
-        applicationsByCompany[companyName] = (applicationsByCompany[companyName] || 0) + 1;
-        
-        // Count by status
-        applicationsByStatus[status] = (applicationsByStatus[status] || 0) + 1;
-        
-        // Count by class
-        applicationsByClass[studentClass] = (applicationsByClass[studentClass] || 0) + 1;
-        
-        // Count by month
-        placementsByMonth[month] = (placementsByMonth[month] || 0) + 1;
-
-        // Company stats for top companies
-        if (!companyStats[companyName]) {
-          companyStats[companyName] = { applications: 0, accepted: 0 };
-        }
-        companyStats[companyName].applications++;
-        if (status === 'accepted') {
-          companyStats[companyName].accepted++;
-        }
-      });
-
-      // Calculate top companies
-      const topCompanies = Object.entries(companyStats)
-        .map(([name, stats]) => ({ name, ...stats }))
-        .sort((a, b) => b.applications - a.applications)
-        .slice(0, 5);
-
-      // Calculate acceptance rate
-      const totalApplications = applicationsData?.length || 0;
-      const acceptedCount = (applicationsData || []).filter((app: any) => app.application_status === 'accepted').length;
-      const acceptanceRate = totalApplications > 0 ? (acceptedCount / totalApplications) * 100 : 0;
-
+      const acceptanceRate = totalApplications > 0 ? (totalAccepted / totalApplications) * 100 : 0;
 
       setStats({
         totalCompanies: new Set(companies.map(c => c.company_name)).size,
         totalApplications,
         totalAccepted,
-        acceptedApplications: acceptedCount,
+        acceptanceRate,
         companiesData,
         classWiseStats
-        applicationsByCompany,
-        applicationsByStatus,
-        applicationsByClass,
-        placementsByMonth,
-        acceptanceRate,
-        topCompanies,
       });
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -276,8 +216,8 @@ export default function AnalyticsScreen() {
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Placement Analytics</Text>
-        <TouchableOpacity style={styles.downloadButton} onPress={generateReport}>
-          <Text style={styles.downloadButtonText}>Download Report</Text>
+        <View style={styles.headerStats}>
+          <Text style={styles.headerStatsText}>2024-25</Text>
         </View>
       </View>
 
@@ -528,113 +468,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     marginLeft: 8,
-  },
-  chartsSection: {
-    marginTop: 24,
-  },
-  chartCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  acceptanceRateCard: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#34C759',
-  },
-  acceptanceRateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  acceptanceRateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#34C759',
-    marginLeft: 8,
-  },
-  acceptanceRateValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#34C759',
-    marginBottom: 8,
-  },
-  acceptanceRateSubtext: {
-    fontSize: 14,
-    color: '#6B6B6B',
-    textAlign: 'center',
-  },
-  topCompaniesCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  companyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
-  },
-  companyRank: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  rankNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  companyInfo: {
-    flex: 1,
-  },
-  companyName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 2,
-  },
-  companyStats: {
-    fontSize: 14,
-    color: '#6B6B6B',
-  },
-  companyRate: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  rateText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
   },
 });
