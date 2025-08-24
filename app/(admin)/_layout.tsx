@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ChartBar as BarChart3, Users, Settings, Briefcase, GraduationCap, Home } from 'lucide-react-native';
+import { ChartBar as BarChart3, Users, Settings, Briefcase, GraduationCap, Chrome as Home } from 'lucide-react-native';
 
 export default function AdminLayout() {
   return (
