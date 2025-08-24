@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { LogOut, Users, BookOpen, Calendar } from 'lucide-react-native';
+import { LogOut, Users, BookOpen, Calendar, BarChart3 } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminDashboard() {
