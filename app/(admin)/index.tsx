@@ -51,6 +51,13 @@ export default function AdminDashboard() {
               <Calendar size={32} color="#FF9500" />
               <Text style={styles.actionText}>Internships</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => router.push('/analytics')}
+            >
+              <BarChart3 size={32} color="#AF52DE" />
+              <Text style={styles.actionText}>Analytics</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
