@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-around',
     marginBottom: 24,
-    gap: 12,
+    gap: 8,
   },
   statCard: {
     backgroundColor: '#FFFFFF',
