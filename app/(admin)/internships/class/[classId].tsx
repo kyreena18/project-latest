@@ -231,10 +231,7 @@ export default function ClassView() {
         STATIC_ASSIGNMENTS.forEach(assignment => {
           const submission = studentSubmissions.find(sub => sub.assignment_type === assignment.type);
           if (submission?.file_url) {
-            row[assignment.title] = {
-              f: `=HYPERLINK("${submission.file_url}", "View Document")`,
-              t: 's'
-            };
+            row[assignment.title] = `=HYPERLINK("${submission.file_url}","View ${assignment.title}")`;
           } else {
             row[assignment.title] = 'Not Submitted';
           }
@@ -255,12 +252,12 @@ export default function ClassView() {
         { wch: 25 }, // Full Name
         { wch: 8 },  // Class
         { wch: 15 }, // UID
-        { wch: 15 }, // Offer Letter
-        { wch: 18 }, // Completion Letter
-        { wch: 15 }, // Weekly Report
-        { wch: 16 }, // Student Outcome
-        { wch: 17 }, // Student Feedback
-        { wch: 17 }, // Company Outcome
+        { wch: 20 }, // Offer Letter
+        { wch: 22 }, // Completion Letter
+        { wch: 18 }, // Weekly Report
+        { wch: 20 }, // Student Outcome
+        { wch: 20 }, // Student Feedback
+        { wch: 20 }, // Company Outcome
         { wch: 20 }, // Offer Letter Approved
         { wch: 18 }  // Credits Awarded
       ];
