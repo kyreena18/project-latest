@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, PieChart } from 'lucide-react-native';
+import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, ChartPie as PieChart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -299,46 +299,6 @@ export default function AnalyticsScreen() {
         {/* Company-wise Statistics */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Company Performance</Text>
-          
-          {/* Pie Chart for Application Status */}
-          <View style={styles.chartContainer}>
-            <Text style={styles.chartTitle}>Application Status Distribution</Text>
-            <View style={styles.pieChartContainer}>
-              <View style={styles.pieChartLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendColor, { backgroundColor: '#34C759' }]} />
-                  <Text style={styles.legendText}>Accepted ({stats.totalAccepted})</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendColor, { backgroundColor: '#FF9500' }]} />
-                  <Text style={styles.legendText}>Pending ({stats.totalApplications - stats.totalAccepted})</Text>
-                </View>
-              </View>
-              <View style={styles.pieChart}>
-                <View 
-                  style={[
-                    styles.pieSlice, 
-                    { 
-                      backgroundColor: '#34C759',
-                      width: `${stats.acceptanceRate}%`,
-                      height: 120
-                    }
-                  ]} 
-                />
-                <View 
-                  style={[
-                    styles.pieSlice, 
-                    { 
-                      backgroundColor: '#FF9500',
-                      width: `${100 - stats.acceptanceRate}%`,
-                      height: 120
-                    }
-                  ]} 
-                />
-              </View>
-            </View>
-          </View>
-
           <View style={styles.tableContainer}>
             <View style={styles.tableHeader}>
               <Text style={[styles.tableHeaderText, { flex: 2 }]}>Company</Text>
@@ -352,31 +312,6 @@ export default function AnalyticsScreen() {
                 <Text style={[styles.tableCell, { flex: 1 }]}>{company.total_applications}</Text>
                 <Text style={[styles.tableCell, { flex: 1 }]}>{company.accepted_applications}</Text>
                 <Text style={[styles.tableCell, { flex: 1 }]}>{company.acceptance_rate.toFixed(1)}%</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Bar Chart for Top Companies */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Companies by Applications</Text>
-          <View style={styles.chartContainer}>
-            <Text style={styles.chartTitle}>Application Volume</Text>
-            {stats.companiesData.slice(0, 5).map((company, index) => (
-              <View key={index} style={styles.barChartItem}>
-                <Text style={styles.barLabel}>{company.company_name}</Text>
-                <View style={styles.barContainer}>
-                  <View 
-                    style={[
-                      styles.barFill, 
-                      { 
-                        width: `${(company.total_applications / Math.max(...stats.companiesData.map(c => c.total_applications))) * 100}%`,
-                        backgroundColor: ['#007AFF', '#34C759', '#FF9500', '#AF52DE', '#FF3B30'][index % 5]
-                      }
-                    ]} 
-                  />
-                  <Text style={styles.barValue}>{company.total_applications}</Text>
-                </View>
               </View>
             ))}
           </View>
@@ -403,11 +338,10 @@ export default function AnalyticsScreen() {
           </View>
         </View>
 
-        {/* Acceptance Rate Visualization */}
+        {/* Simple Chart Representation */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Acceptance Rate Visualization</Text>
           <View style={styles.chartContainer}>
-            <Text style={styles.chartTitle}>Success Rate by Company</Text>
             {stats.companiesData.slice(0, 5).map((company, index) => (
               <View key={index} style={styles.chartBar}>
                 <Text style={styles.chartLabel}>{company.company_name}</Text>
@@ -614,84 +548,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
-  },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  pieChartContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  pieChart: {
-    flexDirection: 'row',
-    height: 120,
-    width: 240,
-    borderRadius: 60,
-    overflow: 'hidden',
-    marginTop: 16,
-  },
-  pieSlice: {
-    borderRadius: 60,
-  },
-  pieChartLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  legendText: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    fontWeight: '500',
-  },
-  barChartItem: {
-    marginBottom: 16,
-  },
-  barLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
-  barContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 32,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 16,
-    minWidth: 20,
-  },
-  barValue: {
-    position: 'absolute',
-    right: 12,
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
   },
   chartBar: {
     marginBottom: 16,
