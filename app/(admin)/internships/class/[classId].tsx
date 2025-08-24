@@ -5,7 +5,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
 
 interface StudentProfile {
   id: string;
@@ -214,6 +213,75 @@ export default function ClassView() {
     }
   };
 
+  const exportToExcel = () => {
+    try {
+      const data = profiles.map((profile, index) => {
+        const studentSubmissions = submissions[profile.student_id] || [];
+        const approval = approvals[profile.student_id];
+        
+        const row: any = {
+          'S.No': index + 1,
+          'Roll Number': profile.roll_no,
+          'Full Name': profile.full_name,
+          'Class': profile.class,
+          'UID': profile.uid,
+        };
+
+        // Add document columns
+        STATIC_ASSIGNMENTS.forEach(assignment => {
+          const submission = studentSubmissions.find(sub => sub.assignment_type === assignment.type);
+          if (submission?.file_url) {
+            row[assignment.title] = {
+              f: `=HYPERLINK("${submission.file_url}", "View Document")`,
+              t: 's'
+            };
+          } else {
+            row[assignment.title] = 'Not Submitted';
+          }
+        });
+
+        row['Offer Letter Approved'] = approval?.offer_letter_approved ? 'Yes' : 'No';
+        row['Credits Awarded'] = approval?.credits_awarded ? 'Yes (2 Credits)' : 'No';
+
+        return row;
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 6 },  // S.No
+        { wch: 15 }, // Roll Number
+        { wch: 25 }, // Full Name
+        { wch: 8 },  // Class
+        { wch: 15 }, // UID
+        { wch: 15 }, // Offer Letter
+        { wch: 18 }, // Completion Letter
+        { wch: 15 }, // Weekly Report
+        { wch: 16 }, // Student Outcome
+        { wch: 17 }, // Student Feedback
+        { wch: 17 }, // Company Outcome
+        { wch: 20 }, // Offer Letter Approved
+        { wch: 18 }  // Credits Awarded
+      ];
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `${classId} Students`);
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
+      
+      // For web environment, use XLSX.writeFile
+      XLSX.writeFile(workbook, filename);
+      
+      Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
+    } catch (error) {
+      console.error('Excel generation error:', error);
+      Alert.alert('Error', 'Failed to generate Excel report');
+    }
+  };
+
   const getStudentSubmission = (studentId: string, assignmentType: string) => {
     const studentSubs = submissions[studentId] || [];
     return studentSubs.find(sub => sub.assignment_type === assignmentType);
@@ -386,8 +454,14 @@ export default function ClassView() {
           <ChevronLeft size={20} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Class: {String(classId)}</Text>
-        <View style={styles.headerStats}>
-          <Text style={styles.headerStatsText}>{profiles.length} Students</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.exportButton} onPress={exportToExcel}>
+            <Download size={16} color="#FFFFFF" />
+            <Text style={styles.exportButtonText}>Export</Text>
+          </TouchableOpacity>
+          <View style={styles.headerStats}>
+            <Text style={styles.headerStatsText}>{profiles.length} Students</Text>
+          </View>
         </View>
       </View>
 
