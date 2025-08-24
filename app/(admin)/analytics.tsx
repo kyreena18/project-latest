@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, ChartPie as PieChart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 interface PlacementStats {
   totalCompanies: number;
