@@ -249,7 +249,76 @@ export default function AnalyticsScreen() {
   };
 
   const generateReport = () => {
-    // Report generation logic
+    try {
+      const doc = new jsPDF();
+      
+      // Title
+      doc.setFontSize(20);
+      doc.text('Placement Analytics Report', 20, 20);
+      
+      // Date
+      doc.setFontSize(12);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 35);
+      
+      // Overview Statistics
+      doc.setFontSize(16);
+      doc.text('Overview Statistics', 20, 55);
+      
+      doc.setFontSize(12);
+      doc.text(`Total Companies: ${stats.totalCompanies}`, 20, 70);
+      doc.text(`Total Applications: ${stats.totalApplications}`, 20, 80);
+      doc.text(`Total Accepted: ${stats.totalAccepted}`, 20, 90);
+      doc.text(`Success Rate: ${stats.acceptanceRate.toFixed(1)}%`, 20, 100);
+      
+      // Company Performance Table
+      doc.setFontSize(16);
+      doc.text('Company Performance', 20, 125);
+      
+      const companyTableData = stats.companiesData.map(company => [
+        company.company_name,
+        company.total_applications.toString(),
+        company.accepted_applications.toString(),
+        `${company.acceptance_rate.toFixed(1)}%`
+      ]);
+      
+      doc.autoTable({
+        head: [['Company', 'Applications', 'Accepted', 'Rate']],
+        body: companyTableData,
+        startY: 135,
+        theme: 'grid',
+        headStyles: { fillColor: [0, 122, 255] }
+      });
+      
+      // Class Performance Table
+      const finalY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(16);
+      doc.text('Class Performance', 20, finalY);
+      
+      const classTableData = stats.classWiseStats.map(classData => [
+        classData.class,
+        classData.total_students.toString(),
+        classData.applied_students.toString(),
+        classData.accepted_students.toString(),
+        classData.total_students > 0 ? `${((classData.accepted_students / classData.total_students) * 100).toFixed(1)}%` : '0%'
+      ]);
+      
+      doc.autoTable({
+        head: [['Class', 'Total Students', 'Applied', 'Placed', 'Placement Rate']],
+        body: classTableData,
+        startY: finalY + 10,
+        theme: 'grid',
+        headStyles: { fillColor: [52, 199, 89] }
+      });
+      
+      // Save the PDF
+      const timestamp = new Date().toISOString().split('T')[0];
+      doc.save(`Placement_Analytics_Report_${timestamp}.pdf`);
+      
+      Alert.alert('Success', 'Analytics report downloaded successfully!');
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      Alert.alert('Error', 'Failed to generate PDF report');
+    }
   };
 
   if (loading) {

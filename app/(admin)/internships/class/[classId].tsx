@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 interface StudentProfile {
   id: string;
