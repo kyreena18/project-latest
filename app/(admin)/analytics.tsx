@@ -1,19 +1,18 @@
-import 'jspdf-autotable';
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, ChartPie as PieChart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Extend jsPDF type to include autoTable
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => void;
+    autoTable: typeof autoTable;
     lastAutoTable: { finalY: number };
   }
 }
-import 'jspdf-autotable';
 
 interface PlacementStats {
   totalCompanies: number;
