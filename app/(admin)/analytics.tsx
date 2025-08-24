@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChartBar as BarChart3, Users, Building, TrendingUp, Award } from 'lucide-react-native';
+import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, PieChart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface PlacementStats {
   totalCompanies: number;
@@ -573,92 +575,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   barText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginLeft: 8,
-  },
-  pieChartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  pieChartLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  legendText: {
-    fontSize: 14,
-    color: '#1C1C1E',
-  },
-  pieChartVisual: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 120,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 60,
-  },
-  pieSlice: {
-    alignItems: 'center',
-  },
-  piePercentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  pieLabel: {
-    fontSize: 12,
-    color: '#6B6B6B',
-  },
-  barChartContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  barChartItem: {
-    marginBottom: 16,
-  },
-  barLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
-  barContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 24,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  bar: {
-    height: '100%',
-    borderRadius: 12,
-  },
-  barValue: {
     fontSize: 12,
     fontWeight: '600',
     color: '#1C1C1E',
