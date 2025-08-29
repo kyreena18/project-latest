@@ -215,7 +215,6 @@ export default function StudentInternshipsScreen() {
         return;
       }
 
-      // Always use student-documents bucket which we know works
       const actualBucket = 'internship-documents';
       console.log('Attempting upload to bucket:', actualBucket);
       console.log('File details:', { name: file.name, size: file.size, type: file.mimeType });
