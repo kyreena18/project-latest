@@ -279,6 +279,72 @@ export default function ClassView() {
     }
   };
 
+  const downloadAllDocuments = async (assignmentType: string) => {
+    try {
+      setDownloading(assignmentType);
+      
+      const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
+      if (!assignment) return;
+
+      // Collect all file URLs for this assignment type
+      const fileUrls: { url: string; studentName: string; rollNo: string }[] = [];
+      
+      profiles.forEach(profile => {
+        const submission = getStudentSubmission(profile.student_id, assignmentType);
+        if (submission?.file_url) {
+          fileUrls.push({
+            url: submission.file_url,
+            studentName: profile.full_name,
+            rollNo: profile.roll_no
+          });
+        }
+      });
+
+      if (fileUrls.length === 0) {
+        Alert.alert('No Documents', `No ${assignment.title} documents found to download.`);
+        return;
+      }
+
+      const zip = new JSZip();
+      let downloadCount = 0;
+
+      // Download each file and add to zip
+      for (const fileData of fileUrls) {
+        try {
+          const response = await fetch(fileData.url);
+          if (response.ok) {
+            const blob = await response.blob();
+            const fileExtension = fileData.url.split('.').pop() || 'pdf';
+            const fileName = `${fileData.rollNo}_${fileData.studentName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`;
+            zip.file(fileName, blob);
+            downloadCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to download file for ${fileData.studentName}:`, error);
+        }
+      }
+
+      if (downloadCount === 0) {
+        Alert.alert('Download Failed', 'Could not download any documents.');
+        return;
+      }
+
+      // Generate and download zip file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const timestamp = new Date().toISOString().split('T')[0];
+      const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
+      
+      saveAs(zipBlob, zipFileName);
+      
+      Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
+    } catch (error) {
+      console.error('Bulk download error:', error);
+      Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const getStudentSubmission = (studentId: string, assignmentType: string) => {
     const studentSubs = submissions[studentId] || [];
     return studentSubs.find(sub => sub.assignment_type === assignmentType);
@@ -456,6 +522,30 @@ export default function ClassView() {
             <Download size={16} color="#FFFFFF" />
             <Text style={styles.exportButtonText}>Export</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.bulkDownloadButton} 
+            onPress={() => {
+              Alert.alert(
+                'Download Documents',
+                'Select document type to download all submissions:',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Offer Letters', onPress: () => downloadAllDocuments('offer_letter') },
+                  { text: 'Completion Letters', onPress: () => downloadAllDocuments('completion_letter') },
+                  { text: 'Weekly Reports', onPress: () => downloadAllDocuments('weekly_report') },
+                  { text: 'Student Outcomes', onPress: () => downloadAllDocuments('student_outcome') },
+                  { text: 'Student Feedback', onPress: () => downloadAllDocuments('student_feedback') },
+                  { text: 'Company Outcomes', onPress: () => downloadAllDocuments('company_outcome') },
+                ]
+              );
+            }}
+            disabled={downloading !== null}
+          >
+            <FolderDown size={16} color="#FFFFFF" />
+            <Text style={styles.bulkDownloadButtonText}>
+              {downloading ? 'Downloading...' : 'Bulk Download'}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.headerStats}>
             <Text style={styles.headerStatsText}>{profiles.length} Students</Text>
           </View>
@@ -603,6 +693,20 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   exportButtonText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  bulkDownloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(175, 82, 222, 0.9)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  bulkDownloadButtonText: {
     fontSize: 12,
     color: '#FFFFFF',
     fontWeight: '600',
