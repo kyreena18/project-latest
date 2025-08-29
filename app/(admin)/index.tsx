@@ -10,7 +10,7 @@ export default function AdminDashboard() {
 
   const handleLogout = async () => {
     await signOut();
-    router.replace('/index.tsx');
+    router.replace('index.tsx');
   };
 
   return (
