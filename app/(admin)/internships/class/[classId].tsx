@@ -5,6 +5,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 interface StudentProfile {
   id: string;
@@ -31,12 +33,12 @@ interface StudentApproval {
 
 // Static assignments configuration matching student side
 const STATIC_ASSIGNMENTS = [
-  { type: 'offer_letter', title: 'Offer Letter', bucket: 'internship-offers' },
-  { type: 'completion_letter', title: 'Completion Letter', bucket: 'internship-completions' },
-  { type: 'weekly_report', title: 'Weekly Report', bucket: 'internship-reports' },
-  { type: 'student_outcome', title: 'Student Outcome', bucket: 'internship-outcomes' },
-  { type: 'student_feedback', title: 'Student Feedback', bucket: 'internship-feedback' },
-  { type: 'company_outcome', title: 'Company Outcome', bucket: 'internship-company' }
+  { type: 'offer_letter', title: 'Offer Letter', bucket: 'internship-offer-letters' },
+  { type: 'completion_letter', title: 'Completion Letter', bucket: 'internship-completion-letters' },
+  { type: 'weekly_report', title: 'Weekly Report', bucket: 'internship-weekly-reports' },
+  { type: 'student_outcome', title: 'Student Outcome', bucket: 'internship-student-outcomes' },
+  { type: 'student_feedback', title: 'Student Feedback', bucket: 'internship-student-feedback' },
+  { type: 'company_outcome', title: 'Company Outcome', bucket: 'internship-company-outcomes' }
 ];
 
 export default function ClassView() {
@@ -47,6 +49,7 @@ export default function ClassView() {
   const [submissions, setSubmissions] = useState<{ [studentId: string]: StudentSubmission[] }>({});
   const [approvals, setApprovals] = useState<{ [studentId: string]: StudentApproval }>({});
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -530,18 +533,16 @@ export default function ClassView() {
                 'Select document type to download all submissions:',
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Offer Letters', onPress: () => downloadAllDocuments('offer_letter') },
-                  { text: 'Completion Letters', onPress: () => downloadAllDocuments('completion_letter') },
-                  { text: 'Weekly Reports', onPress: () => downloadAllDocuments('weekly_report') },
-                  { text: 'Student Outcomes', onPress: () => downloadAllDocuments('student_outcome') },
-                  { text: 'Student Feedback', onPress: () => downloadAllDocuments('student_feedback') },
-                  { text: 'Company Outcomes', onPress: () => downloadAllDocuments('company_outcome') },
+                  ...STATIC_ASSIGNMENTS.map(assignment => ({
+                    text: assignment.title,
+                    onPress: () => downloadAllDocuments(assignment.type)
+                  }))
                 ]
               );
             }}
             disabled={downloading !== null}
           >
-            <FolderDown size={16} color="#FFFFFF" />
+            <Download size={16} color="#FFFFFF" />
             <Text style={styles.bulkDownloadButtonText}>
               {downloading ? 'Downloading...' : 'Bulk Download'}
             </Text>
