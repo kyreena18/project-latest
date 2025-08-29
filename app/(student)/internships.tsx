@@ -227,7 +227,7 @@ export default function StudentInternshipsScreen() {
 
       // Upload to Supabase storage
       const { error: uploadError } = await supabase.storage
-        .from(actualBucket)
+        .from('student-documents')
         .upload(fileName, blob, {
           contentType: file.mimeType || 'application/pdf',
           upsert: true,
@@ -249,7 +249,7 @@ export default function StudentInternshipsScreen() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from(actualBucket)
+        .from('student-documents')
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';

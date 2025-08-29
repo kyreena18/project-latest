@@ -5,7 +5,8 @@ import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import * as FileSaver from 'file-saver';
+import * as JSZip from 'jszip';
 
 interface PlacementEvent {
   id: string;
@@ -62,6 +63,7 @@ export default function AdminPlacementsScreen() {
   const [selectedEvent, setSelectedEvent] = useState<PlacementEvent | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -364,7 +366,7 @@ export default function AdminPlacementsScreen() {
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      saveAs(blob, filename);
+      FileSaver.saveAs(blob, filename);
 
       Alert.alert('Success', `Excel file downloaded successfully!`);
     } catch (error) {
