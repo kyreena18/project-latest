@@ -1061,6 +1061,21 @@ const styles = StyleSheet.create({
     color: '#34C759',
     fontWeight: '600',
   },
+  bulkDownloadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#AF52DE',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    marginTop: 8,
+  },
+  bulkDownloadButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
   applicationCard: {
     backgroundColor: '#F8F9FA',
     borderRadius: 12,

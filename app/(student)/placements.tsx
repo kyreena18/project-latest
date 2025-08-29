@@ -459,7 +459,7 @@ export default function PlacementsScreen() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from(bucketName)
+        .from('placement-offer-letters')
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';
