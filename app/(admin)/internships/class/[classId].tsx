@@ -525,28 +525,6 @@ export default function ClassView() {
             <Download size={16} color="#FFFFFF" />
             <Text style={styles.exportButtonText}>Export</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.bulkDownloadButton} 
-            onPress={() => {
-              Alert.alert(
-                'Download Documents',
-                'Select document type to download all submissions:',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  ...STATIC_ASSIGNMENTS.map(assignment => ({
-                    text: assignment.title,
-                    onPress: () => downloadAllDocuments(assignment.type)
-                  }))
-                ]
-              );
-            }}
-            disabled={downloading !== null}
-          >
-            <Download size={16} color="#FFFFFF" />
-            <Text style={styles.bulkDownloadButtonText}>
-              {downloading ? 'Downloading...' : 'Bulk Download'}
-            </Text>
-          </TouchableOpacity>
           <View style={styles.headerStats}>
             <Text style={styles.headerStatsText}>{profiles.length} Students</Text>
           </View>
@@ -554,6 +532,26 @@ export default function ClassView() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Bulk Download Section */}
+        <View style={styles.bulkDownloadSection}>
+          <Text style={styles.sectionTitle}>Download Documents by Type</Text>
+          <View style={styles.downloadButtonsGrid}>
+            {STATIC_ASSIGNMENTS.map((assignment) => (
+              <TouchableOpacity
+                key={assignment.type}
+                style={[styles.downloadTypeButton, downloading === assignment.type && styles.disabledButton]}
+                onPress={() => downloadAllDocuments(assignment.type)}
+                disabled={downloading === assignment.type}
+              >
+                <Download size={16} color="#FFFFFF" />
+                <Text style={styles.downloadTypeButtonText}>
+                  {downloading === assignment.type ? 'Downloading...' : assignment.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.list}>
           {profiles.map((profile) => {
             const approval = approvals[profile.student_id];
@@ -722,6 +720,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  bulkDownloadSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 16,
+  },
+  downloadButtonsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  downloadTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#AF52DE',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    minWidth: '45%',
+    justifyContent: 'center',
+  },
+  downloadTypeButtonText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#C7C7CC',
   },
   content: {
     flex: 1,

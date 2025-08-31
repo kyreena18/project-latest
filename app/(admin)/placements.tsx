@@ -656,6 +656,17 @@ export default function AdminPlacementsScreen() {
                   <Text style={styles.exportButtonText}>Export to Excel</Text>
                 </TouchableOpacity>
                 
+                <TouchableOpacity
+                  style={[styles.bulkDownloadButton, downloading === event.id && styles.disabledButton]}
+                  onPress={() => downloadPlacementDocuments(event)}
+                  disabled={downloading === event.id}
+                >
+                  <Download size={16} color="#FFFFFF" />
+                  <Text style={styles.bulkDownloadButtonText}>
+                    {downloading === event.id ? 'Downloading...' : 'Download Offer Letters'}
+                  </Text>
+                </TouchableOpacity>
+
                 {applications.map((application) => (
                   <View key={application.id} style={styles.applicationCard}>
                     <View style={styles.applicationHeader}>
