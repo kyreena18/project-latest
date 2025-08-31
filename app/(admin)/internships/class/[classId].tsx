@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
+import { ChevronLeft, FileText, Award, CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
-import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import * as FileSaver from 'file-saver';
@@ -133,23 +132,6 @@ export default function ClassView() {
             }
           }
 
-          // Check for students who should have credits reset
-          const studentsEligibleForCredits = new Set();
-          (subs || []).forEach(sub => {
-            if (sub.assignment_type === 'completion_letter' && sub.submission_status === 'approved') {
-              studentsEligibleForCredits.add(sub.student_id);
-            }
-          });
-
-          // Reset credits for students without approved completion letter
-          for (const studentId of studentIds) {
-            if (!studentsEligibleForCredits.has(studentId)) {
-              await supabase
-                .from('student_internship_approvals')
-                .update({ credits_awarded: false })
-                .eq('student_id', studentId);
-            }
-          }
         }
 
         // Load approvals
@@ -418,7 +400,7 @@ export default function ClassView() {
       const { data: studentRow, error: studentSelectError } = await supabase
         .from('students')
         .select('id, total_credits')
-        .eq('student_id', profile.student_id)
+        .eq('id', profile.student_id)
         .maybeSingle();
 
       if (studentSelectError) {
