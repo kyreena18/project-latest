@@ -166,38 +166,6 @@ export default function ClassView() {
           (apps || []).forEach(app => {
             approvalsByStudent[app.student_id] = app;
           });
-
-          // Filter out approvals for students without offer letters
-          const submissionsByStudent = {};
-          (subs || []).forEach(sub => {
-            if (!submissionsByStudent[sub.student_id]) {
-              submissionsByStudent[sub.student_id] = [];
-            }
-            submissionsByStudent[sub.student_id].push(sub);
-          });
-
-          Object.keys(approvalsByStudent).forEach(studentId => {
-            const studentSubs = submissionsByStudent[studentId] || [];
-            const hasOfferLetter = studentSubs.some(sub => sub.assignment_type === 'offer_letter');
-            const hasApprovedCompletionLetter = studentSubs.some(sub => 
-              sub.assignment_type === 'completion_letter' && sub.submission_status === 'approved'
-            );
-            
-            if (!hasOfferLetter) {
-              approvalsByStudent[studentId] = {
-                ...approvalsByStudent[studentId],
-                offer_letter_approved: false
-              };
-            }
-            
-            if (!hasApprovedCompletionLetter) {
-              approvalsByStudent[studentId] = {
-                ...approvalsByStudent[studentId],
-                credits_awarded: false
-              };
-            }
-          });
-
           setApprovals(approvalsByStudent);
         }
       }
@@ -415,60 +383,47 @@ export default function ClassView() {
   };
 
   const awardCredits = async (profile: StudentProfile) => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
-      // Mock credit awarding for development
-      setApprovals(prev => ({
-        ...prev,
-        [profile.student_id]: { 
-          student_id: profile.student_id, 
-          offer_letter_approved: prev[profile.student_id]?.offer_letter_approved || false, 
-          credits_awarded: true 
-        }
-      }));
-      Alert.alert('Credits Awarded', '2 credits have been awarded to this student.');
-      return;
-    }
-
     try {
-      // First ensure the approval record exists
-      const { data: existingApproval } = await supabase
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
+        // Mock credit awarding for development
+        setApprovals(prev => ({
+          ...prev,
+          [profile.student_id]: { 
+            student_id: profile.student_id, 
+            offer_letter_approved: prev[profile.student_id]?.offer_letter_approved || false, 
+            credits_awarded: true 
+          }
+        }));
+        Alert.alert('Credits Awarded', '2 credits have been awarded to this student.');
+        return;
+      }
+
+      // Upsert the approval record to ensure it exists and is updated
+      const { error: approvalError } = await supabase
         .from('student_internship_approvals')
-        .select('*')
+        .upsert({
+          student_id: profile.student_id,
+          credits_awarded: true,
+          credits_awarded_at: new Date().toISOString(),
+          offer_letter_approved: approvals[profile.student_id]?.offer_letter_approved || false,
+        }, { 
+          onConflict: 'student_id',
+          ignoreDuplicates: false 
+        });
+
+      if (approvalError) throw approvalError;
+
+      // Update student credits in students table
+      const { data: studentRow, error: studentSelectError } = await supabase
+        .from('students')
+        .select('id, total_credits')
         .eq('student_id', profile.student_id)
         .maybeSingle();
 
-      if (!existingApproval) {
-        // Create new approval record
-        const { error: createError } = await supabase
-          .from('student_internship_approvals')
-          .insert({
-            student_id: profile.student_id,
-            offer_letter_approved: false,
-            credits_awarded: true,
-            credits_awarded_at: new Date().toISOString(),
-          });
-
-        if (createError) throw createError;
-      } else {
-        // Update existing approval record
-        const { error: updateError } = await supabase
-          .from('student_internship_approvals')
-          .update({
-            credits_awarded: true,
-            credits_awarded_at: new Date().toISOString(),
-          })
-          .eq('student_id', profile.student_id);
-
-        if (updateError) throw updateError;
+      if (studentSelectError) {
+        console.error('Error finding student:', studentSelectError);
       }
-
-      // Update student credits in students table
-      const { data: studentRow } = await supabase
-        .from('students')
-        .select('id, total_credits')
-        .eq('uid', profile.uid)
-        .maybeSingle();
 
       if (studentRow) {
         const newCredits = (studentRow.total_credits || 0) + 2;
@@ -477,7 +432,9 @@ export default function ClassView() {
           .update({ total_credits: newCredits })
           .eq('id', studentRow.id);
 
-        if (creditsError) throw creditsError;
+        if (creditsError) {
+          console.error('Error updating credits:', creditsError);
+        }
       }
 
       // Update local state
@@ -491,6 +448,9 @@ export default function ClassView() {
       }));
 
       Alert.alert('Credits Awarded', '2 credits have been awarded to this student.');
+      
+      // Reload data to ensure consistency
+      await loadData();
     } catch (err) {
       console.error('Failed to award credits:', err);
       Alert.alert('Error', 'Failed to award credits.');
