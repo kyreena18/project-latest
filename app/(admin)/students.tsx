@@ -129,6 +129,13 @@ export default function AdminStudentsScreen() {
             Select a class to view and manage students
           </Text>
 
+          <TouchableOpacity
+            style={styles.bulkImportButton}
+            onPress={() => router.push('/students/bulk-import')}
+          >
+            <Text style={styles.bulkImportText}>Bulk Import Students from Excel</Text>
+          </TouchableOpacity>
+
           <View style={styles.classesList}>
             {classStats.map((classItem) => (
               <TouchableOpacity
@@ -378,5 +385,18 @@ const styles = StyleSheet.create({
   infoBold: {
     fontWeight: '600',
     color: '#1C1C1E',
+  },
+  bulkImportButton: {
+    backgroundColor: '#34C759',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  bulkImportText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

@@ -431,16 +431,37 @@ export default function ClassView() {
     }
 
     try {
-      // Update student_internship_approvals table
-      const { error: approvalError } = await supabase
+      // First ensure the approval record exists
+      const { data: existingApproval } = await supabase
         .from('student_internship_approvals')
-        .upsert({
-          student_id: profile.student_id,
-          credits_awarded: true,
-          credits_awarded_at: new Date().toISOString(),
-        }, { onConflict: 'student_id' });
+        .select('*')
+        .eq('student_id', profile.student_id)
+        .maybeSingle();
 
-      if (approvalError) throw approvalError;
+      if (!existingApproval) {
+        // Create new approval record
+        const { error: createError } = await supabase
+          .from('student_internship_approvals')
+          .insert({
+            student_id: profile.student_id,
+            offer_letter_approved: false,
+            credits_awarded: true,
+            credits_awarded_at: new Date().toISOString(),
+          });
+
+        if (createError) throw createError;
+      } else {
+        // Update existing approval record
+        const { error: updateError } = await supabase
+          .from('student_internship_approvals')
+          .update({
+            credits_awarded: true,
+            credits_awarded_at: new Date().toISOString(),
+          })
+          .eq('student_id', profile.student_id);
+
+        if (updateError) throw updateError;
+      }
 
       // Update student credits in students table
       const { data: studentRow } = await supabase
@@ -451,10 +472,12 @@ export default function ClassView() {
 
       if (studentRow) {
         const newCredits = (studentRow.total_credits || 0) + 2;
-        await supabase
+        const { error: creditsError } = await supabase
           .from('students')
           .update({ total_credits: newCredits })
           .eq('id', studentRow.id);
+
+        if (creditsError) throw creditsError;
       }
 
       // Update local state
