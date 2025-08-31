@@ -444,8 +444,10 @@ export default function PlacementsScreen() {
       const response = await fetch(file.uri);
       const blob = await response.blob();
 
+      // Upload to placement-offer-letters bucket for offer letters
+      const targetBucket = 'placement-offer-letters';
       const { error: uploadError } = await supabase.storage
-        .from(bucketName)
+        .from(targetBucket)
         .upload(fileName, blob, {
           contentType: file.mimeType || 'application/pdf',
           upsert: true,
@@ -459,7 +461,7 @@ export default function PlacementsScreen() {
 
       // Get public URL
       const { data: urlData } = supabase.storage
-        .from('placement-offer-letters')
+        .from(targetBucket)
         .getPublicUrl(fileName);
 
       const fileUrl = urlData?.publicUrl || '';
