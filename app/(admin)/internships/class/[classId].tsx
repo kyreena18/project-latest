@@ -384,6 +384,19 @@ export default function ClassView() {
 
   const awardCredits = async (profile: StudentProfile) => {
     try {
+      // Check if credits already awarded
+      if (approvals[profile.student_id]?.credits_awarded) {
+        Alert.alert('Already Awarded', 'Credits have already been awarded to this student.');
+        return;
+      }
+
+      // Check if completion letter exists and is submitted
+      const completionSubmission = getStudentSubmission(profile.student_id, 'completion_letter');
+      if (!completionSubmission?.file_url) {
+        Alert.alert('Missing Document', 'Student must submit completion letter before credits can be awarded.');
+        return;
+      }
+
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock credit awarding for development
@@ -399,7 +412,36 @@ export default function ClassView() {
         return;
       }
 
-      // Upsert the approval record to ensure it exists and is updated
+      // First, get the current student data
+      const { data: studentData, error: studentError } = await supabase
+        .from('students')
+        .select('id, total_credits')
+        .eq('id', profile.student_id)
+        .single();
+
+      if (studentError) {
+        console.error('Error finding student:', studentError);
+        Alert.alert('Error', 'Could not find student record.');
+        return;
+      }
+
+      // Calculate new credits
+      const currentCredits = studentData.total_credits || 0;
+      const newCredits = currentCredits + 2;
+
+      // Update student credits first
+      const { error: creditsError } = await supabase
+        .from('students')
+        .update({ total_credits: newCredits })
+        .eq('id', profile.student_id);
+
+      if (creditsError) {
+        console.error('Error updating credits:', creditsError);
+        Alert.alert('Error', 'Failed to update student credits.');
+        return;
+      }
+
+      // Then update the approval record
       const { error: approvalError } = await supabase
         .from('student_internship_approvals')
         .upsert({
@@ -408,33 +450,23 @@ export default function ClassView() {
           credits_awarded_at: new Date().toISOString(),
           offer_letter_approved: approvals[profile.student_id]?.offer_letter_approved || false,
         }, { 
-          onConflict: 'student_id',
-          ignoreDuplicates: false 
+          onConflict: 'student_id'
         });
 
       if (approvalError) throw approvalError;
 
-      // Update student credits in students table
-      const { data: studentRow, error: studentSelectError } = await supabase
-        .from('students')
-        .select('id, total_credits')
-        .eq('id', profile.student_id)
-        .maybeSingle();
+      // Update completion letter submission status to approved
+      const { error: submissionError } = await supabase
+        .from('student_internship_submissions')
+        .update({ 
+          submission_status: 'approved',
+          admin_feedback: '2 credits awarded for internship completion'
+        })
+        .eq('student_id', profile.student_id)
+        .eq('assignment_type', 'completion_letter');
 
-      if (studentSelectError) {
-        console.error('Error finding student:', studentSelectError);
-      }
-
-      if (studentRow) {
-        const newCredits = (studentRow.total_credits || 0) + 2;
-        const { error: creditsError } = await supabase
-          .from('students')
-          .update({ total_credits: newCredits })
-          .eq('id', studentRow.id);
-
-        if (creditsError) {
-          console.error('Error updating credits:', creditsError);
-        }
+      if (submissionError) {
+        console.error('Error updating submission status:', submissionError);
       }
 
       // Update local state
@@ -447,7 +479,7 @@ export default function ClassView() {
         }
       }));
 
-      Alert.alert('Credits Awarded', '2 credits have been awarded to this student.');
+      Alert.alert('Credits Awarded', `2 credits have been awarded to ${profile.full_name}. Total credits: ${newCredits}`);
       
       // Reload data to ensure consistency
       await loadData();
@@ -602,7 +634,7 @@ export default function ClassView() {
                     style={[
                       styles.actionButton, 
                       styles.creditsButton,
-                      creditsAwarded && styles.awardedButton
+                      (creditsAwarded || !getStudentSubmission(profile.student_id, 'completion_letter')) && styles.awardedButton
                     ]}
                     onPress={() => awardCredits(profile)}
                     disabled={creditsAwarded || !getStudentSubmission(profile.student_id, 'completion_letter')}
@@ -612,7 +644,7 @@ export default function ClassView() {
                       {creditsAwarded 
                         ? 'Credits Awarded ✓' 
                         : !getStudentSubmission(profile.student_id, 'completion_letter')
-                        ? 'No Completion Letter'
+                        ? 'Need Completion Letter'
                         : 'Award 2 Credits'
                       }
                     </Text>
