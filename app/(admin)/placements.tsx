@@ -240,89 +240,6 @@ export default function AdminPlacementsScreen() {
     }
   };
 
-  const downloadPlacementDocuments = async (event: PlacementEvent) => {
-    try {
-      setDownloading(event.id);
-      
-      // Get all applications for this event
-      const { data: eventApplications, error } = await supabase
-        .from('placement_applications')
-        .select(`
-          *,
-          students!inner (
-            name, 
-            roll_no,
-            student_profiles (
-              full_name
-            )
-          )
-        `)
-        .eq('placement_event_id', event.id)
-        .eq('application_status', 'accepted');
-
-      if (error) throw error;
-
-      const acceptedApplications = eventApplications || [];
-      
-      if (acceptedApplications.length === 0) {
-        Alert.alert('No Documents', 'No accepted students with offer letters found for this placement.');
-        return;
-      }
-
-      // Collect offer letter URLs
-      const offerLetters = acceptedApplications
-        .filter(app => app.offer_letter_url)
-        .map(app => ({
-          url: app.offer_letter_url,
-          studentName: app.students?.student_profiles?.full_name || app.students?.name || 'Unknown',
-          rollNo: app.students?.roll_no || 'Unknown'
-        }));
-
-      if (offerLetters.length === 0) {
-        Alert.alert('No Documents', 'No offer letters uploaded by accepted students.');
-        return;
-      }
-
-      const zip = new JSZip();
-      let downloadCount = 0;
-
-      // Download each offer letter and add to zip
-      for (const letter of offerLetters) {
-        try {
-          const response = await fetch(letter.url);
-          if (response.ok) {
-            const blob = await response.blob();
-            const fileExtension = letter.url.split('.').pop() || 'pdf';
-            const fileName = `${letter.rollNo}_${letter.studentName.replace(/[^a-zA-Z0-9]/g, '_')}_offer_letter.${fileExtension}`;
-            zip.file(fileName, blob);
-            downloadCount++;
-          }
-        } catch (error) {
-          console.error(`Failed to download offer letter for ${letter.studentName}:`, error);
-        }
-      }
-
-      if (downloadCount === 0) {
-        Alert.alert('Download Failed', 'Could not download any offer letters.');
-        return;
-      }
-
-      // Generate and download zip file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const timestamp = new Date().toISOString().split('T')[0];
-      const zipFileName = `${event.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_Offer_Letters_${timestamp}.zip`;
-      
-      FileSaver.saveAs(zipBlob, zipFileName);
-      
-      Alert.alert('Success', `Downloaded ${downloadCount} offer letters in ${zipFileName}`);
-    } catch (error) {
-      console.error('Bulk download error:', error);
-      Alert.alert('Error', 'Failed to download offer letters.');
-    } finally {
-      setDownloading(null);
-    }
-  };
-
   
   const resetForm = () => {
     setNewEvent({
@@ -741,13 +658,13 @@ export default function AdminPlacementsScreen() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.bulkDownloadButton, downloading === selectedEvent?.id && styles.disabledButton]}
-                  onPress={() => selectedEvent && downloadPlacementDocuments(selectedEvent)}
-                  disabled={downloading === selectedEvent?.id}
+                  style={[styles.bulkDownloadButton, downloading === event.id && styles.disabledButton]}
+                  onPress={() => downloadPlacementDocuments(event)}
+                  disabled={downloading === event.id}
                 >
                   <Download size={16} color="#FFFFFF" />
                   <Text style={styles.bulkDownloadButtonText}>
-                    {downloading === selectedEvent?.id ? 'Downloading...' : 'Download Offer Letters'}
+                    {downloading === event.id ? 'Downloading...' : 'Download Offer Letters'}
                   </Text>
                 </TouchableOpacity>
 
@@ -1117,15 +1034,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 40,
   },
-  disabledButton: {
-    backgroundColor: '#C7C7CC',
-  },
   createEventButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  
   emptyApplications: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -1171,6 +1084,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#C7C7CC',
   },
   applicationCard: {
     backgroundColor: '#F8F9FA',
