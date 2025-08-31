@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native'e-react-native';
+import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
