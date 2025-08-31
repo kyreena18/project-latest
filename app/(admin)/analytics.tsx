@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, ChartPie as PieChart } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { saveAs } from 'file-saver';
+import * as FileSaver from 'file-saver';
 
 interface PlacementStats {
   totalCompanies: number;
@@ -299,7 +300,9 @@ export default function AnalyticsScreen() {
       
       // Save the Excel file
       const timestamp = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `Placement_Analytics_Report_${timestamp}.xlsx`);
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/octet-stream' });
+      FileSaver.default.saveAs(blob, `Placement_Analytics_Report_${timestamp}.xlsx`);
       
       Alert.alert('Success', 'Analytics report downloaded successfully as Excel file!');
     } catch (error) {

@@ -4,8 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDate, getStatusColor } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
+import * as JSZip from 'jszip';
 import * as JSZip from 'jszip';
 
 interface PlacementEvent {
@@ -63,7 +65,6 @@ export default function AdminPlacementsScreen() {
   const [selectedEvent, setSelectedEvent] = useState<PlacementEvent | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
 
   const [newEvent, setNewEvent] = useState({
     title: '',
@@ -152,6 +153,61 @@ export default function AdminPlacementsScreen() {
         }
       ];
       setApplications(mockApplications);
+    }
+  };
+
+  const downloadPlacementDocuments = async (event: PlacementEvent) => {
+    try {
+      // Load applications for this event if not already loaded
+      if (!applications.length || applications[0]?.placement_event_id !== event.id) {
+        await loadEventApplications(event.id);
+      }
+
+      // Filter accepted applications with offer letters
+      const acceptedWithOfferLetters = applications.filter(app => 
+        app.application_status === 'accepted' && app.offer_letter_url
+      );
+
+      if (acceptedWithOfferLetters.length === 0) {
+        Alert.alert('No Documents', 'No offer letters found for accepted students.');
+        return;
+      }
+
+      const zip = new JSZip.default();
+      let downloadCount = 0;
+
+      // Download each offer letter and add to zip
+      for (const application of acceptedWithOfferLetters) {
+        try {
+          const response = await fetch(application.offer_letter_url!);
+          if (response.ok) {
+            const blob = await response.blob();
+            const fileExtension = application.offer_letter_url!.split('.').pop() || 'pdf';
+            const fileName = `${application.students.roll_no}_${application.students.student_profiles?.full_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Unknown'}.${fileExtension}`;
+            zip.file(fileName, blob);
+            downloadCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to download offer letter for ${application.students.name}:`, error);
+        }
+      }
+
+      if (downloadCount === 0) {
+        Alert.alert('Download Failed', 'Could not download any offer letters.');
+        return;
+      }
+
+      // Generate and download zip file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const timestamp = new Date().toISOString().split('T')[0];
+      const zipFileName = `${event.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_Offer_Letters_${timestamp}.zip`;
+      
+      FileSaver.saveAs(zipBlob, zipFileName);
+      
+      Alert.alert('Success', `Downloaded ${downloadCount} offer letters in ${zipFileName}`);
+    } catch (error) {
+      console.error('Bulk download error:', error);
+      Alert.alert('Error', 'Failed to download offer letters.');
     }
   };
 
@@ -366,7 +422,7 @@ export default function AdminPlacementsScreen() {
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      FileSaver.saveAs(blob, filename);
+      FileSaver.default.saveAs(blob, filename);
 
       Alert.alert('Success', `Excel file downloaded successfully!`);
     } catch (error) {
@@ -375,22 +431,6 @@ export default function AdminPlacementsScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'accepted': return '#34C759';
-      case 'rejected': return '#FF3B30';
-      case 'applied': return '#007AFF';
-      default: return '#FF9500';
-    }
-  };
 
   const addAdditionalRequirement = (type: string) => {
     if (newEvent.additional_requirements.some(req => req.type === type)) {
@@ -658,14 +698,11 @@ export default function AdminPlacementsScreen() {
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.bulkDownloadButton, downloading === event.id && styles.disabledButton]}
-                  onPress={() => downloadPlacementDocuments(event)}
-                  disabled={downloading === event.id}
+                  style={styles.bulkDownloadButton}
+                  onPress={() => downloadPlacementDocuments(selectedEvent!)}
                 >
                   <Download size={16} color="#FFFFFF" />
-                  <Text style={styles.bulkDownloadButtonText}>
-                    {downloading === event.id ? 'Downloading...' : 'Download Offer Letters'}
-                  </Text>
+                  <Text style={styles.bulkDownloadButtonText}>Download Offer Letters</Text>
                 </TouchableOpacity>
 
                 {applications.map((application) => (

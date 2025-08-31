@@ -4,6 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { GraduationCap, Upload, FileText, Bell, Lock } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { STATIC_ASSIGNMENTS } from '@/lib/constants';
+import { formatDate, getStatusColor } from '@/lib/utils';
 import * as DocumentPicker from 'expo-document-picker';
 
 interface StudentSubmission {
@@ -21,58 +23,6 @@ interface StudentApproval {
   offer_letter_approved: boolean;
   credits_awarded: boolean;
 }
-
-// Static assignments configuration
-const STATIC_ASSIGNMENTS = [
-  {
-    type: 'offer_letter',
-    title: 'Offer Letter',
-    description: 'Upload your internship offer letter from the company. This must be approved before other assignments.',
-    bucket: 'internship-offer-letters',
-    required: true,
-    unlockOthers: true
-  },
-  {
-    type: 'completion_letter',
-    title: 'Completion Letter',
-    description: 'Upload your internship completion certificate from the company.',
-    bucket: 'internship-completion-letters',
-    required: true,
-    unlockOthers: false
-  },
-  {
-    type: 'weekly_report',
-    title: 'Weekly Report',
-    description: 'Upload your weekly internship progress reports.',
-    bucket: 'internship-weekly-reports',
-    required: true,
-    unlockOthers: false
-  },
-  {
-    type: 'student_outcome',
-    title: 'Student Outcome',
-    description: 'Upload your student outcome assessment document.',
-    bucket: 'internship-student-outcomes',
-    required: true,
-    unlockOthers: false
-  },
-  {
-    type: 'student_feedback',
-    title: 'Student Feedback',
-    description: 'Upload your feedback form about the internship experience.',
-    bucket: 'internship-student-feedback',
-    required: true,
-    unlockOthers: false
-  },
-  {
-    type: 'company_outcome',
-    title: 'Company Outcome',
-    description: 'Upload the company outcome report or evaluation.',
-    bucket: 'internship-company-outcomes',
-    required: true,
-    unlockOthers: false
-  }
-];
 
 export default function StudentInternshipsScreen() {
   const { user } = useAuth();
@@ -296,22 +246,6 @@ export default function StudentInternshipsScreen() {
   const isAssignmentLocked = (assignment: typeof STATIC_ASSIGNMENTS[0]) => {
     if (assignment.type === 'offer_letter') return false;
     return !approval.offer_letter_approved;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return '#34C759';
-      case 'rejected': return '#FF3B30';
-      default: return '#007AFF';
-    }
   };
 
   if (loading) {

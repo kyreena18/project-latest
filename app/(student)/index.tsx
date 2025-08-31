@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { LogOut, Speaker, Calendar, Bell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDate } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 
 interface Notification {
@@ -85,16 +86,6 @@ export default function StudentDashboard() {
     return () => {
       notificationsChannel.unsubscribe();
     };
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const handleLogout = async () => {

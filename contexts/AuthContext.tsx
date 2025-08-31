@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .from('admin_users')
         .select('*')
         .eq('admin_code', code)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         return { success: false, error: 'Invalid admin code' };

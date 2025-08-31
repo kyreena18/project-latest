@@ -4,9 +4,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+import { STATIC_ASSIGNMENTS } from '@/lib/constants';
+import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import * as FileSaver from 'file-saver';
 
 interface StudentProfile {
   id: string;
@@ -30,16 +32,6 @@ interface StudentApproval {
   offer_letter_approved: boolean;
   credits_awarded: boolean;
 }
-
-// Static assignments configuration matching student side
-const STATIC_ASSIGNMENTS = [
-  { type: 'offer_letter', title: 'Offer Letter', bucket: 'internship-offer-letters' },
-  { type: 'completion_letter', title: 'Completion Letter', bucket: 'internship-completion-letters' },
-  { type: 'weekly_report', title: 'Weekly Report', bucket: 'internship-weekly-reports' },
-  { type: 'student_outcome', title: 'Student Outcome', bucket: 'internship-student-outcomes' },
-  { type: 'student_feedback', title: 'Student Feedback', bucket: 'internship-student-feedback' },
-  { type: 'company_outcome', title: 'Company Outcome', bucket: 'internship-company-outcomes' }
-];
 
 export default function ClassView() {
   const router = useRouter();
@@ -337,7 +329,7 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
       
-      saveAs(zipBlob, zipFileName);
+      FileSaver.default.saveAs(zipBlob, zipFileName);
       
       Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
     } catch (error) {

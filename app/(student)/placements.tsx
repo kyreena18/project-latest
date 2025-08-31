@@ -7,6 +7,7 @@ import * as ExpoLinking from 'expo-linking';
 import { Briefcase, Calendar, Building, Users, FileText, Upload, X, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Bell } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDate, getStatusColor, getRequirementLabel } from '@/lib/utils';
 import * as DocumentPicker from 'expo-document-picker';
 
 // Create a cross-platform Linking object
@@ -520,37 +521,8 @@ export default function PlacementsScreen() {
     setShowRequirementsModal(true);
   };
 
-  const getRequirementLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      video_introduction: 'Video Introduction',
-      portfolio: 'Portfolio',
-      cover_letter: 'Cover Letter',
-      certificates: 'Certificates',
-      project_demo: 'Project Demo',
-      coding_sample: 'Coding Sample',
-    };
-    return labels[type] || type.replace('_', ' ').toUpperCase();
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   const isDeadlinePassed = (deadline: string) => {
     return new Date(deadline) < new Date();
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'accepted': return '#34C759';
-      case 'rejected': return '#FF3B30';
-      case 'applied': return '#007AFF';
-      default: return '#FF9500';
-    }
   };
 
   if (loading) {

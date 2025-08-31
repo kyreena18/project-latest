@@ -32,7 +32,7 @@ export default function StudentLayout() {
         .from('student_profiles')
         .select('class')
         .eq('student_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (data?.class) {
         setStudentClass(data.class);
