@@ -8,7 +8,6 @@ import { formatDate, getStatusColor } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import * as FileSaver from 'file-saver';
 import * as JSZip from 'jszip';
-import * as JSZip from 'jszip';
 
 interface PlacementEvent {
   id: string;
