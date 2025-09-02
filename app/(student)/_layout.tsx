@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, User, Building, GraduationCap } from 'lucide-react-native';
+import { Chrome as Home, User, Building, GraduationCap } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -83,7 +83,7 @@ export default function StudentLayout() {
           options={{
             title: 'Placements',
             tabBarIcon: ({ size, color }) => (
-              <Building size={size} color={color} />
+              <Briefcase size={size} color={color} />
             ),
           }}
         />
