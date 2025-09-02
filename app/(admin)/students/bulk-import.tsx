@@ -110,52 +110,65 @@ export default function BulkImportScreen() {
     try {
       setImporting(true);
 
-      // Check for duplicates in database
-      const uids = previewData.map(s => s.uid);
-      const emails = previewData.map(s => s.email);
-      const rollNos = previewData.map(s => s.roll_no);
-
+      // Check for duplicates in database more efficiently
       const { data: existingStudents } = await supabase
         .from('students')
-        .select('uid, email, roll_no')
-        .or(`uid.in.(${uids.join(',')}),email.in.(${emails.join(',')}),roll_no.in.(${rollNos.join(',')})`);
+        .select('uid, email, roll_no');
 
       const existingUIDs = new Set(existingStudents?.map(s => s.uid) || []);
       const existingEmails = new Set(existingStudents?.map(s => s.email) || []);
       const existingRollNos = new Set(existingStudents?.map(s => s.roll_no) || []);
 
-      // Filter out duplicates
+      // Filter out duplicates and validate data
       const newStudents = previewData.filter(student => 
+        student.uid && student.email && student.roll_no && student.name &&
         !existingUIDs.has(student.uid) && 
         !existingEmails.has(student.email) && 
         !existingRollNos.has(student.roll_no)
       );
 
       if (newStudents.length === 0) {
-        Alert.alert('No New Students', 'All students in the file already exist in the database.');
+        Alert.alert('No New Students', 'All students in the file already exist in the database or have invalid data.');
         setImporting(false);
         return;
       }
 
-      // Insert new students
-      const { data: insertedStudents, error } = await supabase
-        .from('students')
-        .insert(newStudents.map(student => ({
-          name: student.name,
-          uid: student.uid,
-          email: student.email,
-          roll_no: student.roll_no,
-          class: student.department || 'SYIT', // Use department field as class
-          total_credits: 0,
-        })))
-        .select();
+      // Insert students one by one to handle individual errors
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: string[] = [];
 
-      if (error) throw error;
+      for (const student of newStudents) {
+        try {
+          const { error } = await supabase
+            .from('students')
+            .insert({
+              name: student.name,
+              uid: student.uid,
+              email: student.email,
+              roll_no: student.roll_no,
+              class: student.class || 'SYIT',
+              total_credits: 0,
+            });
+
+          if (error) {
+            errorCount++;
+            errors.push(`${student.name} (${student.uid}): ${error.message}`);
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          errorCount++;
+          errors.push(`${student.name} (${student.uid}): Unknown error`);
+        }
+      }
 
       const duplicateCount = previewData.length - newStudents.length;
-      const successMessage = `Successfully imported ${newStudents.length} students.${duplicateCount > 0 ? ` ${duplicateCount} duplicates were skipped.` : ''}`;
+      let message = `Successfully imported ${successCount} students.`;
+      if (duplicateCount > 0) message += ` ${duplicateCount} duplicates were skipped.`;
+      if (errorCount > 0) message += ` ${errorCount} failed to import.`;
       
-      Alert.alert('Import Complete', successMessage);
+      Alert.alert('Import Complete', message);
       setPreviewData([]);
       router.back();
     } catch (error) {
@@ -245,7 +258,7 @@ export default function BulkImportScreen() {
             <Text style={styles.formatItem}>• Column E: class (TYIT, TYSD, SYIT, or SYSD)</Text>
           </View>
           <Text style={styles.formatNote}>
-            Note: First row should contain column headers. Class must be one of: TYIT, TYSD, SYIT, SYSD. Duplicate UIDs, emails, or roll numbers will be skipped.
+            Note: First row should contain column headers. All fields are required. Class must be exactly one of: TYIT, TYSD, SYIT, SYSD. Duplicate UIDs, emails, or roll numbers will be skipped automatically.
           </Text>
         </View>
       </ScrollView>
