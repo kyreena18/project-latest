@@ -1,125 +1,87 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Users, GraduationCap, ChevronRight, Plus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 
-interface Student {
-  id: string;
-  name: string;
-  uid: string;
-  roll_no: string;
-  email: string;
-  class: string;
-}
-
-interface ClassData {
+interface ClassStats {
   className: string;
   displayName: string;
-  students: Student[];
+  description: string;
+  studentCount: number;
   color: string;
 }
 
 export default function AdminStudentsScreen() {
   const router = useRouter();
-  const [classData, setClassData] = useState<ClassData[]>([]);
+  const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
 
   useEffect(() => {
-    loadStudentsByClass();
+    loadClassStats();
   }, []);
 
-  const loadStudentsByClass = async () => {
+  const loadClassStats = async () => {
     try {
       // Check if Supabase is configured
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock data for development
-        const mockClassData: ClassData[] = [
-          {
-            className: 'TYIT',
-            displayName: 'Third Year IT',
-            color: '#007AFF',
-            students: [
-              { id: '1', name: 'John Doe', uid: 'TYIT001', roll_no: '001', email: 'john@college.edu', class: 'TYIT' },
-              { id: '2', name: 'Jane Smith', uid: 'TYIT002', roll_no: '002', email: 'jane@college.edu', class: 'TYIT' },
-              { id: '3', name: 'Mike Johnson', uid: 'TYIT003', roll_no: '003', email: 'mike@college.edu', class: 'TYIT' },
-            ]
-          },
-          {
-            className: 'TYSD',
-            displayName: 'Third Year Software Development',
-            color: '#34C759',
-            students: [
-              { id: '4', name: 'Sarah Wilson', uid: 'TYSD001', roll_no: '001', email: 'sarah@college.edu', class: 'TYSD' },
-              { id: '5', name: 'David Brown', uid: 'TYSD002', roll_no: '002', email: 'david@college.edu', class: 'TYSD' },
-            ]
-          },
-          {
-            className: 'SYIT',
-            displayName: 'Second Year IT',
-            color: '#FF9500',
-            students: [
-              { id: '6', name: 'Emily Davis', uid: 'SYIT001', roll_no: '001', email: 'emily@college.edu', class: 'SYIT' },
-              { id: '7', name: 'Chris Miller', uid: 'SYIT002', roll_no: '002', email: 'chris@college.edu', class: 'SYIT' },
-            ]
-          },
-          {
-            className: 'SYSD',
-            displayName: 'Second Year Software Development',
-            color: '#AF52DE',
-            students: [
-              { id: '8', name: 'Lisa Garcia', uid: 'SYSD001', roll_no: '001', email: 'lisa@college.edu', class: 'SYSD' },
-            ]
-          }
+        const classDefinitions = [
+          { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
+          { className: 'TYSD', displayName: 'Third Year Software Development', description: 'Software Development - Final Year', color: '#34C759' },
+          { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
+          { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
         ];
+        const mockStats = classDefinitions.map(def => ({ ...def, studentCount: def.className.startsWith('TY') ? 25 : 28 }));
         
-        setClassData(mockClassData);
-        setTotalStudents(mockClassData.reduce((sum, cls) => sum + cls.students.length, 0));
+        setClassStats(mockStats);
+        setTotalStudents(mockStats.reduce((sum, cls) => sum + cls.studentCount, 0));
         setLoading(false);
         return;
       }
 
       // Real Supabase query
       const { data, error } = await supabase
-        .from('students')
-        .select('id, name, uid, roll_no, email, class')
-        .order('class')
-        .order('roll_no');
+        .from('student_profiles')
+        .select('class')
+        .not('class', 'is', null);
 
       if (error) throw error;
 
-      // Group students by class
-      const studentsByClass: { [key: string]: Student[] } = {};
-      (data || []).forEach(student => {
-        if (!studentsByClass[student.class]) {
-          studentsByClass[student.class] = [];
-        }
-        studentsByClass[student.class].push(student);
-      });
+      // Count students by class
+      const classCounts = (data || []).reduce((acc: { [key: string]: number }, student) => {
+        const className = student.class;
+        acc[className] = (acc[className] || 0) + 1;
+        return acc;
+      }, {});
 
       const classDefinitions = [
-        { className: 'TYIT', displayName: 'Third Year IT', color: '#007AFF' },
-        { className: 'TYSD', displayName: 'Third Year Software Development', color: '#34C759' },
-        { className: 'SYIT', displayName: 'Second Year IT', color: '#FF9500' },
-        { className: 'SYSD', displayName: 'Second Year Software Development', color: '#AF52DE' }
+        { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
+        { className: 'TYSD', displayName: 'Third Year Software Development', description: 'Software Development - Final Year', color: '#34C759' },
+        { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
+        { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
       ];
 
-      const organizedData = classDefinitions.map(classDef => ({
+      const statsWithCounts = classDefinitions.map(classDef => ({
         ...classDef,
-        students: studentsByClass[classDef.className] || []
+        studentCount: classCounts[classDef.className] || 0
       }));
 
-      setClassData(organizedData);
-      setTotalStudents((data || []).length);
+      setClassStats(statsWithCounts);
+      setTotalStudents(Object.values(classCounts).reduce((sum: number, count: number) => sum + count, 0));
     } catch (error) {
-      console.error('Error loading students:', error);
-      setClassData([]);
+      console.error('Error loading class stats:', error);
+      setClassStats([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const navigateToClass = (className: string) => {
+    router.push(`/(admin)/students/class/${className}`);
   };
 
   if (loading) {
@@ -151,51 +113,56 @@ export default function AdminStudentsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {classData.map((classItem) => (
-          <View key={classItem.className} style={styles.classSection}>
-            <View style={styles.classHeader}>
-              <View style={[styles.classIcon, { backgroundColor: classItem.color }]}>
-                <GraduationCap size={20} color="#FFFFFF" />
-              </View>
-              <View style={styles.classInfo}>
-                <Text style={styles.className}>{classItem.className}</Text>
-                <Text style={styles.classDisplayName}>{classItem.displayName}</Text>
-              </View>
-              <View style={styles.classStats}>
-                <Text style={styles.studentCount}>{classItem.students.length}</Text>
-                <Text style={styles.studentLabel}>Students</Text>
-              </View>
+        <View style={styles.overviewCard}>
+          <View style={styles.overviewHeader}>
+            <Users size={32} color="#007AFF" />
+            <View style={styles.overviewInfo}>
+              <Text style={styles.overviewTitle}>Student Overview</Text>
+              <Text style={styles.overviewSubtitle}>
+                Manage students across all classes
+              </Text>
             </View>
-
-            {classItem.students.length === 0 ? (
-              <View style={styles.emptyClass}>
-                <Text style={styles.emptyText}>No students in this class</Text>
-              </View>
-            ) : (
-              <View style={styles.studentsList}>
-                {classItem.students.map((student) => (
-                  <View key={student.id} style={styles.studentCard}>
-                    <View style={styles.studentInfo}>
-                      <Text style={styles.studentName}>{student.name}</Text>
-                      <Text style={styles.studentDetails}>
-                        UID: {student.uid} • Roll: {student.roll_no}
-                      </Text>
-                      <Text style={styles.studentEmail}>{student.email}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={styles.viewStudentsButton}
-              onPress={() => router.push(`/(admin)/students/class/${classItem.className}`)}
-            >
-              <Text style={styles.viewStudentsText}>View Students</Text>
-              <ChevronRight size={16} color="#007AFF" />
-            </TouchableOpacity>
           </View>
-        ))}
+          <View style={styles.overviewStats}>
+            <Text style={styles.totalStudents}>{totalStudents}</Text>
+            <Text style={styles.totalLabel}>Total Students</Text>
+          </View>
+        </View>
+
+        <View style={styles.classesSection}>
+          <Text style={styles.sectionTitle}>Classes</Text>
+          <Text style={styles.sectionSubtitle}>
+            Select a class to view and manage students
+          </Text>
+
+          <View style={styles.classesList}>
+            {classStats.map((classItem) => (
+              <View key={classItem.className} style={styles.classCard}>
+                <View style={styles.classHeader}>
+                  <View style={[styles.classIcon, { backgroundColor: classItem.color }]}>
+                    <GraduationCap size={24} color="#FFFFFF" />
+                  </View>
+                  <View style={styles.classInfo}>
+                    <Text style={styles.className}>{classItem.className}</Text>
+                    <Text style={styles.classDisplayName}>{classItem.displayName}</Text>
+                    <Text style={styles.classDescription}>{classItem.description}</Text>
+                  </View>
+                  <View style={styles.classStats}>
+                    <Text style={styles.studentCount}>{classItem.studentCount}</Text>
+                    <Text style={styles.studentLabel}>Students</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.viewStudentsButton}
+                  onPress={() => navigateToClass(classItem.className)}
+                >
+                  <Text style={styles.viewStudentsText}>View Students</Text>
+                  <ChevronRight size={16} color="#007AFF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -262,10 +229,75 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'center',
   },
-  classSection: {
+  overviewCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  overviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
+  },
+  overviewInfo: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  overviewTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  overviewSubtitle: {
+    fontSize: 14,
+    color: '#6B6B6B',
+  },
+  overviewStats: {
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    paddingVertical: 20,
+  },
+  totalStudents: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  totalLabel: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
+  classesSection: {
+    marginBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    opacity: 0.9,
+    marginBottom: 16,
+  },
+  classesList: {
+    gap: 20,
+  },
+  classCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -275,17 +307,15 @@ const styles = StyleSheet.create({
   classHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    marginBottom: 16,
   },
   classIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   classInfo: {
     flex: 1,
@@ -298,13 +328,19 @@ const styles = StyleSheet.create({
   },
   classDisplayName: {
     fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  classDescription: {
+    fontSize: 12,
     color: '#6B6B6B',
   },
   classStats: {
     alignItems: 'center',
   },
   studentCount: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1C1C1E',
     marginBottom: 2,
@@ -313,51 +349,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6B6B6B',
   },
-  emptyClass: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6B6B6B',
-    fontStyle: 'italic',
-  },
-  studentsList: {
-    padding: 16,
-    gap: 12,
-  },
-  studentCard: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  studentInfo: {
-    gap: 4,
-  },
-  studentName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-  },
-  studentDetails: {
-    fontSize: 14,
-    color: '#6B6B6B',
-  },
-  studentEmail: {
-    fontSize: 14,
-    color: '#007AFF',
-  },
   viewStudentsButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginTop: 12,
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
   },
   viewStudentsText: {
     fontSize: 16,
