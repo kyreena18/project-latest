@@ -25,10 +25,10 @@ export default function BulkImportScreen() {
   const downloadTemplate = () => {
     try {
       const templateData = [
-        ['name', 'uid', 'email', 'roll_no', 'department', 'year'],
-        ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'Computer Science', '3rd Year'],
-        ['Jane Smith', 'TYSD002', 'jane.smith@college.edu', 'TYSD002', 'Computer Science', '3rd Year'],
-        ['Mike Johnson', 'SYIT003', 'mike.johnson@college.edu', 'SYIT003', 'Computer Science', '2nd Year'],
+        ['name', 'uid', 'email', 'roll_no', 'class'],
+        ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'TYIT'],
+        ['Jane Smith', 'TYSD002', 'jane.smith@college.edu', 'TYSD002', 'TYSD'],
+        ['Mike Johnson', 'SYIT003', 'mike.johnson@college.edu', 'SYIT003', 'SYIT'],
       ];
 
       const worksheet = XLSX.utils.aoa_to_sheet(templateData);
