@@ -81,7 +81,7 @@ export default function AdminStudentsScreen() {
   };
 
   const navigateToClass = (className: string) => {
-    router.push(`/students/class/${className}`);
+    router.push(`/(admin)/students/class/${className}`);
   };
 
   if (loading) {
@@ -131,7 +131,7 @@ export default function AdminStudentsScreen() {
 
           <TouchableOpacity
             style={styles.bulkImportButton}
-            onPress={() => router.push('/students/bulk-import')}
+            onPress={() => router.push('/(admin)/students/bulk-import')}
           >
             <Text style={styles.bulkImportText}>Bulk Import Students from Excel</Text>
           </TouchableOpacity>

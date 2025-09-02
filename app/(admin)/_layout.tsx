@@ -30,7 +30,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="students"
         options={{
-          title: 'Students',
+          title: 'Student Mgmt',
           tabBarIcon: ({ size, color }) => (
             <Users size={size} color={color} />
           ),
