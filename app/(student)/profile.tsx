@@ -131,6 +131,16 @@ export default function StudentProfile() {
         updated_at: new Date().toISOString(),
       };
 
+      // Also update the class in the students table
+      const { error: studentUpdateError } = await supabase
+        .from('students')
+        .update({ class: profile.class })
+        .eq('id', user.id);
+
+      if (studentUpdateError) {
+        console.error('Error updating student class:', studentUpdateError);
+      }
+
       const { data: existingProfile } = await supabase
         .from('student_profiles')
         .select('id')

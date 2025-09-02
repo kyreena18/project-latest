@@ -104,13 +104,11 @@ export default function StudentLogin() {
             <View style={styles.dividerLine} />
           </View>
 
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={() => router.push('/(auth)/student-register')}
-          >
-            <UserPlus size={20} color="#007AFF" style={styles.registerIcon} />
-            <Text style={styles.registerButtonText}>Register New Account</Text>
-          </TouchableOpacity>
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoText}>
+              Contact your administrator to register your account
+            </Text>
+          </View>
         </View>
       </View>
     </LinearGradient>
@@ -226,22 +224,15 @@ const styles = StyleSheet.create({
     color: '#6B6B6B',
     marginHorizontal: 16,
   },
-  registerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  infoContainer: {
     backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    paddingVertical: 16,
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
   },
-  registerIcon: {
-    marginRight: 8,
-  },
-  registerButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+  infoText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    textAlign: 'center',
   },
 });

@@ -145,9 +145,7 @@ export default function BulkImportScreen() {
           uid: student.uid,
           email: student.email,
           roll_no: student.roll_no,
-          department: student.department || 'Computer Science',
-          year: student.year || '1st Year',
-          gpa: 0.0,
+          class: student.department || 'SYIT', // Use department field as class
           total_credits: 0,
         })))
         .select();
