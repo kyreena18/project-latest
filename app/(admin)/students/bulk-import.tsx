@@ -117,14 +117,12 @@ export default function BulkImportScreen() {
 
       const existingUIDs = new Set(existingStudents?.map(s => s.uid) || []);
       const existingEmails = new Set(existingStudents?.map(s => s.email) || []);
-      const existingRollNos = new Set(existingStudents?.map(s => s.roll_no) || []);
 
       // Filter out duplicates and validate data
       const newStudents = previewData.filter(student => 
         student.uid && student.email && student.roll_no && student.name &&
         !existingUIDs.has(student.uid) && 
-        !existingEmails.has(student.email) && 
-        !existingRollNos.has(student.roll_no)
+        !existingEmails.has(student.email)
       );
 
       if (newStudents.length === 0) {
@@ -258,7 +256,7 @@ export default function BulkImportScreen() {
             <Text style={styles.formatItem}>• Column E: class (TYIT, TYSD, SYIT, or SYSD)</Text>
           </View>
           <Text style={styles.formatNote}>
-            Note: First row should contain column headers. All fields are required. Class must be exactly one of: TYIT, TYSD, SYIT, SYSD. Duplicate UIDs, emails, or roll numbers will be skipped automatically.
+            Note: First row should contain column headers. All fields are required. Class must be exactly one of: TYIT, TYSD, SYIT, SYSD. Duplicate UIDs and emails will be skipped automatically. Roll numbers can be duplicated across different classes.
           </Text>
         </View>
       </ScrollView>
