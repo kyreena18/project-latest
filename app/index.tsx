@@ -1,7 +1,10 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { UserCog, GraduationCap } from 'lucide-react-native';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -53,78 +56,86 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: screenWidth * 0.05, // 5% padding on each side
+    paddingVertical: screenHeight * 0.08, // 8% padding top/bottom
   },
   content: {
-    width: '95%',
-    maxWidth: 380,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    maxWidth: Math.min(screenWidth * 0.9, 400), // Max 90% width or 400px
+    alignSelf: 'center',
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: screenHeight * 0.04, // 4% of screen height
   },
   logo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: Math.max(screenWidth * 0.15, 60), // 15% of width, min 60px
+    height: Math.max(screenWidth * 0.15, 60),
+    borderRadius: Math.max(screenWidth * 0.075, 30),
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: screenHeight * 0.02, // 2% of screen height
   },
   title: {
-    fontSize: 28,
+    fontSize: Math.max(screenWidth * 0.07, 24), // 7% of width, min 24px
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 4,
+    marginBottom: screenHeight * 0.005,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14), // 4% of width, min 14px
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: screenHeight * 0.01,
     textAlign: 'center',
     opacity: 0.9,
   },
   loginPrompt: {
-    fontSize: 18,
+    fontSize: Math.max(screenWidth * 0.045, 16), // 4.5% of width, min 16px
     color: '#FFFFFF',
-    marginBottom: 32,
+    marginBottom: screenHeight * 0.04,
     textAlign: 'center',
     opacity: 0.9,
   },
   buttonContainer: {
     width: '100%',
-    gap: 16,
+    gap: screenHeight * 0.02, // 2% of screen height
   },
   loginButton: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: Math.max(screenWidth * 0.04, 12), // 4% of width, min 12px
+    paddingVertical: screenHeight * 0.025, // 2.5% of screen height
+    paddingHorizontal: screenWidth * 0.05, // 5% of screen width
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
+    minHeight: screenHeight * 0.08, // Minimum 8% of screen height
   },
   buttonContent: {
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
   },
   buttonText: {
-    fontSize: 18,
+    fontSize: Math.max(screenWidth * 0.045, 16), // 4.5% of width, min 16px
     fontWeight: '600',
     color: '#1C1C1E',
-    marginTop: 8,
-    marginBottom: 6,
+    marginTop: screenHeight * 0.01,
+    marginBottom: screenHeight * 0.005,
     textAlign: 'center',
+    flexWrap: 'wrap',
   },
   buttonSubtext: {
-    fontSize: 13,
+    fontSize: Math.max(screenWidth * 0.032, 12), // 3.2% of width, min 12px
     color: '#6B6B6B',
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 4,
+    lineHeight: Math.max(screenWidth * 0.04, 16),
+    paddingHorizontal: screenWidth * 0.02,
+    flexWrap: 'wrap',
   },
 });
