@@ -25,10 +25,10 @@ export default function BulkImportScreen() {
   const downloadTemplate = () => {
     try {
       const templateData = [
-        ['name', 'uid', 'email', 'roll_no', 'class'],
-        ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'TYIT'],
-        ['Jane Smith', 'TYSD002', 'jane.smith@college.edu', 'TYSD002', 'TYSD'],
-        ['Mike Johnson', 'SYIT003', 'mike.johnson@college.edu', 'SYIT003', 'SYIT'],
+        ['name', 'uid', 'email', 'roll_no', 'department', 'year'],
+        ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'Computer Science', '3rd Year'],
+        ['Jane Smith', 'TYSD002', 'jane.smith@college.edu', 'TYSD002', 'Computer Science', '3rd Year'],
+        ['Mike Johnson', 'SYIT003', 'mike.johnson@college.edu', 'SYIT003', 'Computer Science', '2nd Year'],
       ];
 
       const worksheet = XLSX.utils.aoa_to_sheet(templateData);
@@ -242,11 +242,10 @@ export default function BulkImportScreen() {
             <Text style={styles.formatItem}>• Column B: uid (College UID)</Text>
             <Text style={styles.formatItem}>• Column C: email (College Email)</Text>
             <Text style={styles.formatItem}>• Column D: roll_no (Roll Number)</Text>
-            <Text style={styles.formatItem}>• Column E: department (Optional, defaults to "Computer Science")</Text>
-            <Text style={styles.formatItem}>• Column F: year (Optional, defaults to "1st Year")</Text>
+            <Text style={styles.formatItem}>• Column E: class (TYIT, TYSD, SYIT, or SYSD)</Text>
           </View>
           <Text style={styles.formatNote}>
-            Note: First row should contain column headers. Duplicate UIDs, emails, or roll numbers will be skipped.
+            Note: First row should contain column headers. Class must be one of: TYIT, TYSD, SYIT, SYSD. Duplicate UIDs, emails, or roll numbers will be skipped.
           </Text>
         </View>
       </ScrollView>

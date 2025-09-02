@@ -30,8 +30,9 @@ export default function StudentLayout() {
 
       const { data, error } = await supabase
         .from('student_profiles')
+        .from('students')
         .select('class')
-        .eq('student_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (data?.class) {

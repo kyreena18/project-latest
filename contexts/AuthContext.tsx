@@ -205,9 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           uid: data.uid,
           email: data.email,
           roll_no: data.rollNo,
-          department: 'Computer Science', // Default department
-          year: '1st Year', // Default year
-          gpa: 0.0,
+          class: 'SYIT', // Default class
           total_credits: 0,
         })
         .select()
