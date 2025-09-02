@@ -186,6 +186,14 @@ export default function AdminStudentsScreen() {
                 ))}
               </View>
             )}
+
+            <TouchableOpacity
+              style={styles.viewStudentsButton}
+              onPress={() => router.push(`/(admin)/students/class/${classItem.className}`)}
+            >
+              <Text style={styles.viewStudentsText}>View Students</Text>
+              <ChevronRight size={16} color="#007AFF" />
+            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
@@ -340,5 +348,20 @@ const styles = StyleSheet.create({
   studentEmail: {
     fontSize: 14,
     color: '#007AFF',
+  },
+  viewStudentsButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 12,
+  },
+  viewStudentsText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
   },
 });
