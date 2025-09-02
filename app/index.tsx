@@ -12,8 +12,15 @@ export default function WelcomeScreen() {
       style={styles.container}
     >
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to Campus Connect</Text>
-        <Text style={styles.subtitle}>Choose your login type</Text>
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <GraduationCap size={48} color="#FFFFFF" />
+          </View>
+          <Text style={styles.title}>Campus Connect</Text>
+          <Text style={styles.subtitle}>Home Page</Text>
+        </View>
+        
+        <Text style={styles.loginPrompt}>Choose your login type</Text>
         
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -23,7 +30,7 @@ export default function WelcomeScreen() {
             <View style={styles.buttonContent}>
               <UserCog size={32} color="#007AFF" />
               <Text style={styles.buttonText}>Admin Login</Text>
-              <Text style={styles.buttonSubtext}>Access administrative features</Text>
+              <Text style={styles.buttonSubtext}>Access admin features</Text>
             </View>
           </TouchableOpacity>
 
@@ -34,7 +41,7 @@ export default function WelcomeScreen() {
             <View style={styles.buttonContent}>
               <GraduationCap size={32} color="#007AFF" />
               <Text style={styles.buttonText}>Student Login</Text>
-              <Text style={styles.buttonSubtext}>Access your student portal</Text>
+              <Text style={styles.buttonSubtext}>Access student portal</Text>
             </View>
           </TouchableOpacity>
         </View>
@@ -50,32 +57,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
-    width: '90%',
-    maxWidth: 400,
+    width: '95%',
+    maxWidth: 380,
     alignItems: 'center',
   },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: 4,
     textAlign: 'center',
   },
   subtitle: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+  loginPrompt: {
     fontSize: 18,
     color: '#FFFFFF',
-    marginBottom: 40,
+    marginBottom: 32,
     textAlign: 'center',
     opacity: 0.9,
   },
   buttonContainer: {
     width: '100%',
-    gap: 20,
+    gap: 16,
   },
   loginButton: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -86,15 +113,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1C1C1E',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 6,
+    textAlign: 'center',
   },
   buttonSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6B6B6B',
     textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 4,
   },
 });
