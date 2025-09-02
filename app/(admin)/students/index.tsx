@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Users, GraduationCap, ChevronRight, Plus } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface ClassStats {
   className: string;
@@ -176,12 +179,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: screenHeight * 0.07,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingBottom: screenHeight * 0.025,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: Math.max(screenWidth * 0.06, 20),
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
@@ -206,18 +209,18 @@ const styles = StyleSheet.create({
   },
   headerStats: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: screenWidth * 0.03,
+    paddingHorizontal: screenWidth * 0.03,
+    paddingVertical: screenHeight * 0.008,
   },
   headerStatsText: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#FFFFFF',
     fontWeight: '600',
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: screenWidth * 0.05,
   },
   loadingContainer: {
     flex: 1,
@@ -225,15 +228,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14),
     color: '#FFFFFF',
     textAlign: 'center',
   },
   overviewCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
+    borderRadius: screenWidth * 0.05,
+    padding: screenWidth * 0.06,
+    marginBottom: screenHeight * 0.03,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -243,61 +246,61 @@ const styles = StyleSheet.create({
   overviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: screenHeight * 0.025,
   },
   overviewInfo: {
-    marginLeft: 16,
+    marginLeft: screenWidth * 0.04,
     flex: 1,
   },
   overviewTitle: {
-    fontSize: 20,
+    fontSize: Math.max(screenWidth * 0.05, 18),
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginBottom: 4,
+    marginBottom: screenHeight * 0.005,
   },
   overviewSubtitle: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#6B6B6B',
   },
   overviewStats: {
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    paddingVertical: 20,
+    borderRadius: screenWidth * 0.04,
+    paddingVertical: screenHeight * 0.025,
   },
   totalStudents: {
-    fontSize: 36,
+    fontSize: Math.max(screenWidth * 0.09, 28),
     fontWeight: 'bold',
     color: '#007AFF',
-    marginBottom: 4,
+    marginBottom: screenHeight * 0.005,
   },
   totalLabel: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#6B6B6B',
     fontWeight: '500',
   },
   classesSection: {
-    marginBottom: 40,
+    marginBottom: screenHeight * 0.05,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: Math.max(screenWidth * 0.05, 18),
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: screenHeight * 0.01,
   },
   sectionSubtitle: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#FFFFFF',
     opacity: 0.9,
-    marginBottom: 16,
+    marginBottom: screenHeight * 0.02,
   },
   classesList: {
-    gap: 20,
+    gap: screenHeight * 0.025,
   },
   classCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: screenWidth * 0.05,
+    padding: screenWidth * 0.05,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -307,46 +310,47 @@ const styles = StyleSheet.create({
   classHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: screenHeight * 0.02,
   },
   classIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: Math.max(screenWidth * 0.12, 40),
+    height: Math.max(screenWidth * 0.12, 40),
+    borderRadius: Math.max(screenWidth * 0.06, 20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: screenWidth * 0.04,
   },
   classInfo: {
     flex: 1,
   },
   className: {
-    fontSize: 18,
+    fontSize: Math.max(screenWidth * 0.045, 16),
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginBottom: 2,
+    marginBottom: screenHeight * 0.003,
   },
   classDisplayName: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#007AFF',
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: screenHeight * 0.003,
   },
   classDescription: {
-    fontSize: 12,
+    fontSize: Math.max(screenWidth * 0.03, 10),
     color: '#6B6B6B',
+    flexWrap: 'wrap',
   },
   classStats: {
     alignItems: 'center',
   },
   studentCount: {
-    fontSize: 24,
+    fontSize: Math.max(screenWidth * 0.06, 20),
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginBottom: 2,
+    marginBottom: screenHeight * 0.003,
   },
   studentLabel: {
-    fontSize: 12,
+    fontSize: Math.max(screenWidth * 0.03, 10),
     color: '#6B6B6B',
   },
   viewStudentsButton: {
@@ -354,15 +358,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 16,
+    borderRadius: screenWidth * 0.03,
+    paddingHorizontal: screenWidth * 0.04,
+    paddingVertical: screenHeight * 0.015,
+    marginTop: screenHeight * 0.02,
     borderTopWidth: 1,
     borderTopColor: '#E5E5EA',
   },
   viewStudentsText: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14),
     color: '#007AFF',
     fontWeight: '600',
   },

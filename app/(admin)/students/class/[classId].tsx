@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, User, Mail, Hash, FileText, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface Student {
   id: string;
@@ -193,10 +196,6 @@ export default function ClassStudentsView() {
                         <FileText size={14} color="#6B6B6B" />
                         <Text style={styles.detailText}>Roll: {student.roll_no}</Text>
                       </View>
-                      <View style={styles.detailRow}>
-                        <Mail size={14} color="#6B6B6B" />
-                        <Text style={styles.detailText}>{student.email}</Text>
-                      </View>
                     </View>
                   </View>
                   <View style={styles.creditsInfo}>
@@ -221,51 +220,51 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingTop: screenHeight * 0.07,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingBottom: screenHeight * 0.025,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: Math.max(screenWidth * 0.09, 32),
+    height: Math.max(screenWidth * 0.09, 32),
+    borderRadius: Math.max(screenWidth * 0.045, 16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.2)'
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: Math.max(screenWidth * 0.05, 18),
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   exportButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: Math.max(screenWidth * 0.09, 32),
+    height: Math.max(screenWidth * 0.09, 32),
+    borderRadius: Math.max(screenWidth * 0.045, 16),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(52, 199, 89, 0.9)',
   },
   classInfo: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: screenWidth * 0.05,
+    paddingBottom: screenHeight * 0.025,
   },
   classDisplayName: {
-    fontSize: 18,
+    fontSize: Math.max(screenWidth * 0.045, 16),
     fontWeight: '600',
     color: '#FFFFFF',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: screenHeight * 0.005,
   },
   studentCountText: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#FFFFFF',
     opacity: 0.9,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: screenWidth * 0.05,
   },
   loadingContainer: {
     flex: 1,
@@ -273,15 +272,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14),
     color: '#FFFFFF',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: screenHeight * 0.08,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    margin: 20,
+    borderRadius: screenWidth * 0.05,
+    margin: screenWidth * 0.05,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -289,25 +288,26 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   emptyStateTitle: {
-    fontSize: 20,
+    fontSize: Math.max(screenWidth * 0.05, 18),
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: screenHeight * 0.02,
+    marginBottom: screenHeight * 0.01,
   },
   emptyStateText: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14),
     color: '#6B6B6B',
     textAlign: 'center',
+    paddingHorizontal: screenWidth * 0.05,
   },
   studentsList: {
-    gap: 12,
-    paddingBottom: 40,
+    gap: screenHeight * 0.015,
+    paddingBottom: screenHeight * 0.05,
   },
   studentCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: screenWidth * 0.04,
+    padding: screenWidth * 0.04,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -319,16 +319,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   studentAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: Math.max(screenWidth * 0.12, 40),
+    height: Math.max(screenWidth * 0.12, 40),
+    borderRadius: Math.max(screenWidth * 0.06, 20),
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: screenWidth * 0.04,
   },
   studentAvatarText: {
-    fontSize: 16,
+    fontSize: Math.max(screenWidth * 0.04, 14),
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
@@ -336,38 +336,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   studentName: {
-    fontSize: 18,
+    fontSize: Math.max(screenWidth * 0.045, 16),
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginBottom: 8,
+    marginBottom: screenHeight * 0.01,
+    flexWrap: 'wrap',
+    lineHeight: Math.max(screenWidth * 0.05, 18),
   },
   studentDetails: {
-    gap: 4,
+    gap: screenHeight * 0.005,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: screenWidth * 0.02,
   },
   detailText: {
-    fontSize: 14,
+    fontSize: Math.max(screenWidth * 0.035, 12),
     color: '#6B6B6B',
+    flexWrap: 'wrap',
+    flex: 1,
   },
   creditsInfo: {
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: screenWidth * 0.03,
+    paddingHorizontal: screenWidth * 0.03,
+    paddingVertical: screenHeight * 0.01,
   },
   creditsNumber: {
-    fontSize: 20,
+    fontSize: Math.max(screenWidth * 0.05, 18),
     fontWeight: 'bold',
     color: '#007AFF',
-    marginBottom: 2,
+    marginBottom: screenHeight * 0.003,
   },
   creditsLabel: {
-    fontSize: 12,
+    fontSize: Math.max(screenWidth * 0.03, 10),
     color: '#6B6B6B',
   },
 });
