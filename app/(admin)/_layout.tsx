@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ChartBar as BarChart3, Users, Settings, Building, GraduationCap, Chrome as Home } from 'lucide-react-native'';
+import { BarChart3, Users, Settings, Building, GraduationCap, Home } from 'lucide-react-native';
 
 export default function AdminLayout() {
   return (
@@ -21,7 +21,7 @@ export default function AdminLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: 'Home',
           tabBarIcon: ({ size, color }) => (
             <Home size={size} color={color} />
           ),
