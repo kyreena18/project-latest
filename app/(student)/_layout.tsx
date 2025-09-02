@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, User, Building, GraduationCap } from 'lucide-react-native';
+import { Chrome as Home, User, Building, GraduationCap } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
