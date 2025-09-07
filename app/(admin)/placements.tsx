@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Building, Calendar, Users, X, Edit, Trash2, Eye, FileText, Download, ExternalLink } from 'lucide-react-native';
+import { Plus, Building, Calendar, Users, X, CreditCard as Edit, Trash2, Eye, FileText, Download, ExternalLink } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
