@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GraduationCap, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
+import * as XLSX from 'xlsx';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Platform, Alert } from 'react-native';
 
 interface ClassStats {
   className: string;
@@ -18,6 +22,7 @@ export default function AdminInternshipsScreen() {
   const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     loadClassStats();
@@ -25,7 +30,6 @@ export default function AdminInternshipsScreen() {
 
   const loadClassStats = async () => {
     try {
-      // Check if Supabase is configured
       const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock data for development
@@ -43,7 +47,6 @@ export default function AdminInternshipsScreen() {
         return;
       }
 
-      // Real Supabase query
       const { data, error } = await supabase
         .from('student_profiles')
         .select('class')
@@ -51,8 +54,7 @@ export default function AdminInternshipsScreen() {
 
       if (error) throw error;
 
-      // Count students by class
-      const classCounts = (data || []).reduce((acc: { [key: string]: number }, student) => {
+      const classCounts = (data || []).reduce((acc: { [key: string]: number }, student: any) => {
         const className = student.class;
         acc[className] = (acc[className] || 0) + 1;
         return acc;
@@ -82,6 +84,69 @@ export default function AdminInternshipsScreen() {
 
   const navigateToClass = (className: string) => {
     router.push(`/(admin)/internships/class/${className}`);
+  };
+
+  // Helper: export classStats to Excel and save/share
+  const exportClassStatsToExcel = async () => {
+    if (classStats.length === 0) {
+      Alert.alert('No data', 'No class stats to export.');
+      return;
+    }
+    try {
+      setExporting(true);
+      const exportData = classStats.map((c, idx) => ({
+        'S.No': idx + 1,
+        'Class Code': c.className,
+        'Display Name': c.displayName,
+        'Description': c.description,
+        'Student Count': c.studentCount,
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(wb, ws, 'ClassStats');
+
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `Internships_ClassStats_${timestamp}.xlsx`;
+
+      await saveAndShareBase64(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    } catch (err) {
+      console.error('Excel generation error (internships):', err);
+      Alert.alert('Export Failed', 'Could not generate Excel file.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Utility: save & share base64 data (works on mobile and web)
+  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        // Web fallback: create anchor with data URL
+        const link = document.createElement('a');
+        link.href = `data:${mime};base64,${base64Data}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return;
+      }
+
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+      // Sharing
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share Excel file' });
+      } else {
+        Alert.alert('Saved', `File saved to ${fileUri}`);
+      }
+    } catch (err) {
+      console.error('saveAndShareBase64 error:', err);
+      Alert.alert('Error', 'Failed to save or share file.');
+    }
   };
 
   if (loading) {
@@ -189,10 +254,19 @@ export default function AdminInternshipsScreen() {
             ))}
           </View>
         </View>
+
+        <TouchableOpacity
+          style={[styles.createEventButton, exporting && styles.disabledButton]}
+          onPress={exportClassStatsToExcel}
+          disabled={exporting}
+        >
+          <Text style={styles.createEventButtonText}>{exporting ? 'Exporting...' : 'Export Class Stats (Excel)'}</Text>
+        </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
