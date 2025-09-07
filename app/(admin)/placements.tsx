@@ -8,9 +8,8 @@ import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser'
 import { formatDate, getStatusColor } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
+import { downloadFile } from '@/lib/utils';
 
 interface PlacementEvent {
   id: string;
@@ -189,18 +188,13 @@ export default function AdminPlacementsScreen() {
                      offerLettersList;
       
       const filename = `${event.company_name}_offer_letters_${new Date().toISOString().split('T')[0]}.txt`;
-      const uri = FileSystem.documentDirectory + filename;
       
-      await FileSystem.writeAsStringAsync(uri, content);
+      const success = await downloadFile(content, filename, 'text/plain');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'text/plain',
-          dialogTitle: 'Share Offer Letter Links'
-        });
+      if (success) {
         Alert.alert('Success', `Offer letter links shared! You can now access all ${acceptedWithOfferLetters.length} documents.`);
       } else {
-        Alert.alert('Links Ready', `Offer letter links saved to: ${uri}`);
+        Alert.alert('Links Ready', 'Offer letter links have been prepared for download.');
       }
     } catch (error) {
       console.error('Bulk download error:', error);
@@ -409,24 +403,14 @@ export default function AdminPlacementsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
 
-      // Mobile-compatible Excel generation
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-      const uri = FileSystem.documentDirectory + filename;
       
-      await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Save Applications Report',
-          UTI: 'com.microsoft.excel.xlsx'
-        });
+      if (success) {
         Alert.alert('Success', 'Excel file ready for download!');
       } else {
-        console.error('File save error:', error);
-        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+        Alert.alert('Report Ready', 'Excel report has been prepared for download.');
       }
     } catch (error) {
       console.error('Export error:', error);

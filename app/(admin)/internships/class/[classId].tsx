@@ -8,9 +8,8 @@ import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
+import { downloadFile } from '@/lib/utils';
 
 interface StudentProfile {
   id: string;
@@ -230,24 +229,14 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
       
-      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-      const uri = FileSystem.documentDirectory + filename;
       
-      await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Save Internship Report',
-          UTI: 'com.microsoft.excel.xlsx'
-        });
+      if (success) {
         Alert.alert('Success', `Excel report for ${classId} ready for download!`);
       } else {
-        console.error('File save error:', error);
-        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+        Alert.alert('Report Ready', 'Excel report has been prepared for download.');
       }
     } catch (error) {
       console.error('Excel generation error:', error);
@@ -256,10 +245,11 @@ export default function ClassView() {
   };
 
   const downloadAllDocuments = async (assignmentType: string) => {
+    let assignment;
     try {
       setDownloading(assignmentType);
       
-      const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
+      assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
       if (!assignment) return;
 
       // Collect all file URLs for this assignment type
@@ -293,18 +283,13 @@ export default function ClassView() {
                      documentsList;
       
       const filename = `${classId}_${assignment.type}_links_${new Date().toISOString().split('T')[0]}.txt`;
-      const uri = FileSystem.documentDirectory + filename;
       
-      await FileSystem.writeAsStringAsync(uri, content);
+      const success = await downloadFile(content, filename, 'text/plain');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'text/plain',
-          dialogTitle: `Share ${assignment.title} Document Links`
-        });
+      if (success) {
         Alert.alert('Success', `Document links shared! You can now access all ${fileUrls.length} documents.`);
       } else {
-        Alert.alert('Links Ready', `Document links saved to: ${uri}`);
+        Alert.alert('Links Ready', 'Document links have been prepared for download.');
       }
     } catch (error) {
       console.error('Bulk download error:', error);

@@ -7,8 +7,7 @@ import { supabase } from '@/lib/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { downloadFile } from '@/lib/utils';
 
 interface StudentData {
   name: string;
@@ -47,24 +46,14 @@ export default function BulkImportScreen() {
         { wch: 12 }, // year
       ];
 
-      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-      const uri = FileSystem.documentDirectory + 'student_import_template.xlsx';
       
-      await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const success = await downloadFile(wbout, 'student_import_template.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Save Student Import Template',
-          UTI: 'com.microsoft.excel.xlsx'
-        });
+      if (success) {
         Alert.alert('Template Ready', 'Fill in the template with student data and upload it back.');
       } else {
-        console.error('File save error:', error);
-        Alert.alert('Template Ready', `Template saved to: ${uri}`);
+        Alert.alert('Template Ready', 'Template has been prepared for download.');
       }
     } catch (error) {
       console.error('Template generation error:', error);

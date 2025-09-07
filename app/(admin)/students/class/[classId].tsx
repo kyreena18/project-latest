@@ -6,8 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, User, Hash, FileText, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { downloadFile } from '@/lib/utils';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -134,23 +133,14 @@ export default function ClassStudentsView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Students_${timestamp}.xlsx`;
       
-      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-      const uri = FileSystem.documentDirectory + filename;
       
-      await FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Save Student List',
-          UTI: 'com.microsoft.excel.xlsx'
-        });
+      if (success) {
         Alert.alert('Success', `Excel report for ${classId} ready for download!`);
       } else {
-        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+        Alert.alert('Report Ready', 'Excel report has been prepared for download.');
       }
     } catch (error) {
       console.error('Excel generation error:', error);

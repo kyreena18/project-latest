@@ -6,9 +6,8 @@ import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
+import { downloadFile } from '@/lib/utils';
 
 interface PlacementStats {
   totalCompanies: number;
@@ -304,27 +303,15 @@ export default function AnalyticsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `Placement_Analytics_Report_${timestamp}.xlsx`;
       
-      // Mobile-compatible implementation
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-      const uri = FileSystem.documentDirectory + filename;
       
-      FileSystem.writeAsStringAsync(uri, wbout, {
-        encoding: FileSystem.EncodingType.Base64,
-      }).then(async () => {
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(uri, {
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            dialogTitle: 'Save Analytics Report',
-            UTI: 'com.microsoft.excel.xlsx'
-          });
-          Alert.alert('Success', 'Analytics report ready for download!');
-        } else {
-          Alert.alert('Download Ready', `Report saved to: ${uri}`);
-        }
-      }).catch((error) => {
-        console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to generate report');
-      });
+      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      
+      if (success) {
+        Alert.alert('Success', 'Analytics report ready for download!');
+      } else {
+        Alert.alert('Download Ready', 'Analytics report has been prepared for download.');
+      }
     } catch (error) {
       console.error('Excel generation error:', error);
       Alert.alert('Error', 'Failed to generate Excel report');
