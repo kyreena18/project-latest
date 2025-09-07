@@ -240,6 +240,8 @@ export default function ClassStudentsView() {
                     </View>
                   </View>
                   <View style={styles.creditsInfo}>
+                  </View>
+                </View>
               </View>
             ))}
           </View>
@@ -393,5 +395,7 @@ const styles = StyleSheet.create({
     color: '#6B6B6B',
     flexWrap: 'wrap',
     flex: 1,
+  },
+  creditsInfo: {
   },
 });
