@@ -71,8 +71,19 @@ export default function ClassStudentsView() {
 
       // Real Supabase query
       const { data, error } = await supabase
-        .from('students')
-        .select('*')
+        .from('student_profiles')
+        .select(`
+          id,
+          student_id,
+          full_name,
+          uid,
+          roll_no,
+          class,
+          students!inner(
+            name,
+            email
+          )
+        `)
         .eq('class', String(classId))
         .order('roll_no');
 
@@ -80,7 +91,17 @@ export default function ClassStudentsView() {
         console.error('Error loading students:', error);
         setStudents([]);
       } else {
-        setStudents(data || []);
+        // Transform the data to match the Student interface
+        const transformedData = (data || []).map(profile => ({
+          id: profile.id,
+          name: profile.full_name || profile.students?.name || 'Unknown',
+          uid: profile.uid,
+          roll_no: profile.roll_no,
+          email: profile.students?.email || '',
+          class: profile.class,
+          total_credits: 0 // Remove credits display
+        }));
+        setStudents(transformedData);
       }
     } catch (error) {
       console.error('Error loading students:', error);
@@ -92,19 +113,12 @@ export default function ClassStudentsView() {
 
   const exportToExcel = () => {
     try {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Feature Not Available', 'Excel export is only available on web platform.');
-        return;
-      }
-
       const data = students.map((student, index) => ({
         'S.No': index + 1,
         'Name': student.name,
         'UID': student.uid,
         'Roll Number': student.roll_no,
-        'Email': student.email,
         'Class': student.class,
-        'Total Credits': student.total_credits,
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(data);
@@ -115,9 +129,7 @@ export default function ClassStudentsView() {
         { wch: 25 }, // Name
         { wch: 15 }, // UID
         { wch: 15 }, // Roll Number
-        { wch: 30 }, // Email
         { wch: 8 },  // Class
-        { wch: 15 }, // Total Credits
       ];
       worksheet['!cols'] = colWidths;
 
@@ -127,7 +139,22 @@ export default function ClassStudentsView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Students_${timestamp}.xlsx`;
       
-      XLSX.writeFile(workbook, filename);
+      if (Platform.OS === 'web') {
+        XLSX.writeFile(workbook, filename);
+      } else {
+        // Mobile implementation
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+        const uri = FileSystem.documentDirectory + filename;
+        
+        FileSystem.writeAsStringAsync(uri, wbout, {
+          encoding: FileSystem.EncodingType.Base64,
+        }).then(() => {
+          Sharing.shareAsync(uri);
+        }).catch((error) => {
+          console.error('File save error:', error);
+          Alert.alert('Error', 'Failed to save file');
+        });
+      }
       
       Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
     } catch (error) {
@@ -213,10 +240,6 @@ export default function ClassStudentsView() {
                     </View>
                   </View>
                   <View style={styles.creditsInfo}>
-                    <Text style={styles.creditsNumber}>{student.total_credits}</Text>
-                    <Text style={styles.creditsLabel}>Credits</Text>
-                  </View>
-                </View>
               </View>
             ))}
           </View>
@@ -370,22 +393,5 @@ const styles = StyleSheet.create({
     color: '#6B6B6B',
     flexWrap: 'wrap',
     flex: 1,
-  },
-  creditsInfo: {
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: screenWidth * 0.03,
-    paddingHorizontal: screenWidth * 0.03,
-    paddingVertical: screenHeight * 0.01,
-  },
-  creditsNumber: {
-    fontSize: Math.max(screenWidth * 0.05, 18),
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: screenHeight * 0.003,
-  },
-  creditsLabel: {
-    fontSize: Math.max(screenWidth * 0.03, 10),
-    color: '#6B6B6B',
   },
 });

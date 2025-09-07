@@ -21,6 +21,7 @@ export default function AdminStudentsScreen() {
   const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
+  const [students, setStudents] = useState<any[]>([]);
 
   useEffect(() => {
     loadClassStats();
@@ -47,19 +48,29 @@ export default function AdminStudentsScreen() {
       }
 
       // Real Supabase query
-      const { data, error } = await supabase
+      const { data: profilesData, error: profilesError } = await supabase
         .from('student_profiles')
-        .select('class')
+        .select('class, full_name, uid, roll_no')
         .not('class', 'is', null);
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
       // Count students by class
-      const classCounts = (data || []).reduce((acc: { [key: string]: number }, student) => {
+      const classCounts = (profilesData || []).reduce((acc: { [key: string]: number }, student) => {
         const className = student.class;
         acc[className] = (acc[className] || 0) + 1;
         return acc;
       }, {});
+
+      // Sort students by roll number within each class
+      const sortedStudents = (profilesData || []).sort((a, b) => {
+        if (a.class !== b.class) {
+          return a.class.localeCompare(b.class);
+        }
+        return a.roll_no.localeCompare(b.roll_no);
+      });
+
+      setStudents(sortedStudents);
 
       const classDefinitions = [
         { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
@@ -81,6 +92,10 @@ export default function AdminStudentsScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStudentsForClass = (className: string) => {
+    return students.filter(student => student.class === className);
   };
 
   const navigateToClass = (className: string) => {
@@ -155,6 +170,31 @@ export default function AdminStudentsScreen() {
                     <Text style={styles.studentLabel}>Students</Text>
                   </View>
                 </View>
+                
+                {/* Show first few students from this class */}
+                <View style={styles.studentsPreview}>
+                  {getStudentsForClass(classItem.className).slice(0, 3).map((student, index) => (
+                    <View key={index} style={styles.studentPreviewCard}>
+                      <View style={styles.studentAvatar}>
+                        <Text style={styles.studentAvatarText}>
+                          {student.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'ST'}
+                        </Text>
+                      </View>
+                      <View style={styles.studentPreviewInfo}>
+                        <Text style={styles.studentPreviewName}>{student.full_name}</Text>
+                        <Text style={styles.studentPreviewDetails}>
+                          {student.uid} • {student.roll_no}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  {getStudentsForClass(classItem.className).length > 3 && (
+                    <Text style={styles.moreStudentsText}>
+                      +{getStudentsForClass(classItem.className).length - 3} more students
+                    </Text>
+                  )}
+                </View>
+                
                 <TouchableOpacity
                   style={styles.viewStudentsButton}
                   onPress={() => navigateToClass(classItem.className)}
@@ -352,6 +392,52 @@ const styles = StyleSheet.create({
   studentLabel: {
     fontSize: Math.max(screenWidth * 0.03, 10),
     color: '#6B6B6B',
+  },
+  studentsPreview: {
+    marginTop: screenHeight * 0.02,
+    marginBottom: screenHeight * 0.015,
+    gap: screenHeight * 0.01,
+  },
+  studentPreviewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: screenWidth * 0.03,
+    padding: screenWidth * 0.03,
+  },
+  studentAvatar: {
+    width: Math.max(screenWidth * 0.08, 28),
+    height: Math.max(screenWidth * 0.08, 28),
+    borderRadius: Math.max(screenWidth * 0.04, 14),
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: screenWidth * 0.03,
+  },
+  studentAvatarText: {
+    fontSize: Math.max(screenWidth * 0.025, 9),
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  studentPreviewInfo: {
+    flex: 1,
+  },
+  studentPreviewName: {
+    fontSize: Math.max(screenWidth * 0.035, 12),
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: screenHeight * 0.002,
+  },
+  studentPreviewDetails: {
+    fontSize: Math.max(screenWidth * 0.03, 10),
+    color: '#6B6B6B',
+  },
+  moreStudentsText: {
+    fontSize: Math.max(screenWidth * 0.03, 10),
+    color: '#6B6B6B',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingVertical: screenHeight * 0.005,
   },
   viewStudentsButton: {
     flexDirection: 'row',

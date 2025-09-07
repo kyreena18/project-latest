@@ -32,11 +32,6 @@ export default function BulkImportScreen() {
 
   const downloadTemplate = () => {
     try {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Feature Not Available', 'Template download is only available on web platform.');
-        return;
-      }
-
       const templateData = [
         ['name', 'uid', 'email', 'roll_no', 'department', 'year'],
         ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'Computer Science', '3rd Year'],
@@ -58,9 +53,24 @@ export default function BulkImportScreen() {
         { wch: 12 }, // year
       ];
 
-      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      FileSaver.saveAs(blob, 'student_import_template.xlsx');
+      if (Platform.OS === 'web') {
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        FileSaver.saveAs(blob, 'student_import_template.xlsx');
+      } else {
+        // Mobile implementation
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+        const uri = FileSystem.documentDirectory + 'student_import_template.xlsx';
+        
+        FileSystem.writeAsStringAsync(uri, wbout, {
+          encoding: FileSystem.EncodingType.Base64,
+        }).then(() => {
+          Sharing.shareAsync(uri);
+        }).catch((error) => {
+          console.error('File save error:', error);
+          Alert.alert('Error', 'Failed to save template');
+        });
+      }
 
       Alert.alert('Template Downloaded', 'Fill in the template with student data and upload it back.');
     } catch (error) {

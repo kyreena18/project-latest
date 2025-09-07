@@ -187,11 +187,6 @@ export default function ClassView() {
 
   const exportToExcel = () => {
     try {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Feature Not Available', 'Excel export is only available on web platform.');
-        return;
-      }
-
       const data = profiles.map((profile, index) => {
         const studentSubmissions = submissions[profile.student_id] || [];
         const approval = approvals[profile.student_id];
@@ -208,7 +203,11 @@ export default function ClassView() {
         STATIC_ASSIGNMENTS.forEach(assignment => {
           const submission = studentSubmissions.find(sub => sub.assignment_type === assignment.type);
           if (submission?.file_url) {
-            row[assignment.title] = `=HYPERLINK("${submission.file_url}","View ${assignment.title}")`;
+            if (Platform.OS === 'web') {
+              row[assignment.title] = `=HYPERLINK("${submission.file_url}","View ${assignment.title}")`;
+            } else {
+              row[assignment.title] = submission.file_url;
+            }
           } else {
             row[assignment.title] = 'Not Submitted';
           }
@@ -246,7 +245,22 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
       
-      XLSX.writeFile(workbook, filename);
+      if (Platform.OS === 'web') {
+        XLSX.writeFile(workbook, filename);
+      } else {
+        // Mobile implementation
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+        const uri = FileSystem.documentDirectory + filename;
+        
+        FileSystem.writeAsStringAsync(uri, wbout, {
+          encoding: FileSystem.EncodingType.Base64,
+        }).then(() => {
+          Sharing.shareAsync(uri);
+        }).catch((error) => {
+          console.error('File save error:', error);
+          Alert.alert('Error', 'Failed to save file');
+        });
+      }
       
       Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
     } catch (error) {
@@ -257,11 +271,6 @@ export default function ClassView() {
 
   const downloadAllDocuments = async (assignmentType: string) => {
     try {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Feature Not Available', 'Bulk download is only available on web platform.');
-        return;
-      }
-
       setDownloading(assignmentType);
       
       const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
@@ -286,38 +295,114 @@ export default function ClassView() {
         return;
       }
 
-      const zip = new JSZip();
-      let downloadCount = 0;
+      if (Platform.OS === 'web') {
+        const zip = new JSZip();
+        let downloadCount = 0;
 
-      // Download each file and add to zip
-      for (const fileData of fileUrls) {
-        try {
-          const response = await fetch(fileData.url);
-          if (response.ok) {
-            const blob = await response.blob();
-            const fileExtension = fileData.url.split('.').pop() || 'pdf';
-            const fileName = `${fileData.rollNo}_${fileData.studentName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`;
-            zip.file(fileName, blob);
-            downloadCount++;
+        // Download each file and add to zip
+        for (const fileData of fileUrls) {
+          try {
+            const response = await fetch(fileData.url);
+            if (response.ok) {
+              const blob = await response.blob();
+              const fileExtension = fileData.url.split('.').pop() || 'pdf';
+              const fileName = `${fileData.rollNo}_${fileData.studentName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`;
+              zip.file(fileName, blob);
+              downloadCount++;
+            }
+          } catch (error) {
+            console.error(`Failed to download file for ${fileData.studentName}:`, error);
           }
-        } catch (error) {
-          console.error(`Failed to download file for ${fileData.studentName}:`, error);
         }
-      }
 
-      if (downloadCount === 0) {
-        Alert.alert('Download Failed', 'Could not download any documents.');
+        if (downloadCount === 0) {
+          Alert.alert('Download Failed', 'Could not download any documents.');
+          return;
+        }
+
+        // Generate and download zip file
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const timestamp = new Date().toISOString().split('T')[0];
+        const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
+        
+        FileSaver.saveAs(zipBlob, zipFileName);
+        
+        Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
+      } else {
+        // Mobile implementation - open each document individually
+        Alert.alert(
+          'Download Documents',
+          `Found ${fileUrls.length} ${assignment.title} documents. They will be opened individually for download.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Download All', 
+              onPress: async () => {
+                let downloadCount = 0;
+                for (const fileData of fileUrls) {
+                  try {
+                    await Linking.openURL(fileData.url);
+                    downloadCount++;
+                    // Small delay between downloads
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                  } catch (error) {
+                    console.error(`Failed to open file for ${fileData.studentName}:`, error);
+                  }
+                }
+                Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
+              }
+            }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Bulk download error:', error);
+      Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const downloadAllDocumentsMobile = async (assignmentType: string) => {
+    try {
+      setDownloading(assignmentType);
+      
+      const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
+      if (!assignment) return;
+
+      // Collect all file URLs for this assignment type
+      const fileUrls: { url: string; studentName: string; rollNo: string }[] = [];
+      
+      profiles.forEach(profile => {
+        const submission = getStudentSubmission(profile.student_id, assignmentType);
+        if (submission?.file_url) {
+          fileUrls.push({
+            url: submission.file_url,
+            studentName: profile.full_name,
+            rollNo: profile.roll_no
+          });
+        }
+      });
+
+      if (fileUrls.length === 0) {
+        Alert.alert('No Documents', `No ${assignment.title} documents found to download.`);
         return;
       }
 
-      // Generate and download zip file
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const timestamp = new Date().toISOString().split('T')[0];
-      const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
-      
-      FileSaver.saveAs(zipBlob, zipFileName);
-      
-      Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
+      // For mobile, open each document individually
+      let downloadCount = 0;
+      for (const fileData of fileUrls) {
+        try {
+          await Linking.openURL(fileData.url);
+          downloadCount++;
+          // Small delay between opening files
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (error) {
+          console.error(`Failed to open file for ${fileData.studentName}:`, error);
+        }
+      }
+
+      Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
@@ -338,11 +423,16 @@ export default function ClassView() {
       return;
     }
     try {
-      // Force the URL to open in browser for viewing instead of downloading
-      const viewUrl = submission.file_url.includes('?') 
-        ? `${submission.file_url}&view=true` 
-        : `${submission.file_url}?view=true`;
-      await Linking.openURL(viewUrl);
+      if (Platform.OS === 'web') {
+        // Force the URL to open in browser for viewing instead of downloading
+        const viewUrl = submission.file_url.includes('?') 
+          ? `${submission.file_url}&view=true` 
+          : `${submission.file_url}?view=true`;
+        await Linking.openURL(viewUrl);
+      } else {
+        // Mobile implementation
+        await Linking.openURL(submission.file_url);
+      }
     } catch (error) {
       Alert.alert('Error', `Failed to open ${title}.`);
     }
