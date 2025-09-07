@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-native';
+import { Plus, Building, Calendar, Users, X, Edit, Trash2, Eye, FileText, Download, ExternalLink } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
-import { formatDate, getStatusColor } from '@/lib/utils';
+import { formatDate, getStatusColor, downloadFileWithFallback } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { Linking } from 'react-native';
 import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
@@ -64,6 +66,7 @@ export default function AdminPlacementsScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<PlacementEvent | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -418,7 +421,60 @@ export default function AdminPlacementsScreen() {
     }
   };
 
+  const downloadApplicationsExcel = async (event: PlacementEvent) => {
+    try {
+      setDownloading(`excel_${event.id}`);
+      
+      const data = applications.map((app, index) => ({
+        'S.No': index + 1,
+        'Student Name': app.student_profiles?.full_name || 'N/A',
+        'UID': app.student_profiles?.uid || 'N/A',
+        'Roll Number': app.student_profiles?.roll_no || 'N/A',
+        'Class': app.student_profiles?.class || 'N/A',
+        'Email': app.students?.email || 'N/A',
+        'Application Status': app.application_status.toUpperCase(),
+        'Applied Date': formatDate(app.applied_at),
+        'Admin Notes': app.admin_notes || 'None',
+      }));
 
+      const worksheet = XLSX.utils.json_to_sheet(data);
+      
+      // Set column widths
+      const colWidths = [
+        { wch: 6 },  // S.No
+        { wch: 25 }, // Student Name
+        { wch: 15 }, // UID
+        { wch: 12 }, // Roll Number
+        { wch: 8 },  // Class
+        { wch: 30 }, // Email
+        { wch: 15 }, // Application Status
+        { wch: 12 }, // Applied Date
+        { wch: 30 }, // Admin Notes
+      ];
+      worksheet['!cols'] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Applications');
+      
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `${event.company_name}_${event.title}_Applications_${timestamp}.xlsx`;
+      
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+      
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      
+      if (success) {
+        Alert.alert('Success', `Applications report for ${event.company_name} ready for download!`);
+      } else {
+        Alert.alert('Report Ready', 'Applications report has been prepared for download.');
+      }
+    } catch (error) {
+      console.error('Excel generation error:', error);
+      Alert.alert('Error', 'Failed to generate applications report');
+    } finally {
+      setDownloading(null);
+    }
+  };
   const addAdditionalRequirement = (type: string) => {
     if (newEvent.additional_requirements.some(req => req.type === type)) {
       return; // Already added
@@ -501,6 +557,20 @@ export default function AdminPlacementsScreen() {
                 <Eye size={16} color="#007AFF" />
                 <Text style={styles.viewButtonText}>View Applications</Text>
               </TouchableOpacity>
+              
+              {/* Download Actions */}
+              <View style={styles.downloadActions}>
+                <TouchableOpacity
+                  style={[styles.downloadActionButton, downloading === `offers_${event.id}` && styles.disabledButton]}
+                  onPress={() => downloadOfferLetters(event)}
+                  disabled={downloading === `offers_${event.id}`}
+                >
+                  <FileText size={14} color="#34C759" />
+                  <Text style={styles.downloadActionText}>
+                    {downloading === `offers_${event.id}` ? 'Downloading...' : 'Offer Letters'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </View>
@@ -751,6 +821,15 @@ export default function AdminPlacementsScreen() {
                         <Text style={styles.acceptButtonText}>Mark as Accepted</Text>
                       </TouchableOpacity>
                     )}
+                    {app.offer_letter_url && (
+                      <TouchableOpacity
+                        style={styles.offerLetterLink}
+                        onPress={() => Linking.openURL(app.offer_letter_url!)}
+                      >
+                        <ExternalLink size={14} color="#007AFF" />
+                        <Text style={styles.offerLetterLinkText}>View Offer Letter</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 ))}
               </View>
@@ -904,6 +983,33 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  downloadActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  downloadActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#34C759',
+  },
+  downloadActionText: {
+    fontSize: 12,
+    color: '#34C759',
+    fontWeight: '600',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   modalContainer: {
     flex: 1,
@@ -1200,6 +1306,18 @@ const styles = StyleSheet.create({
   },
   acceptButtonText: {
     color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  offerLetterLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  offerLetterLinkText: {
+    fontSize: 12,
+    color: '#007AFF',
     fontWeight: '600',
   },
 });
