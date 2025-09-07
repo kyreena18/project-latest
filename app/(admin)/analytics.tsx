@@ -305,7 +305,7 @@ export default function AnalyticsScreen() {
       
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
       
-      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
       if (success) {
         Alert.alert('Success', 'Analytics report ready for download!');

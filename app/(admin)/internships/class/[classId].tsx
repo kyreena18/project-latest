@@ -231,7 +231,7 @@ export default function ClassView() {
       
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       
-      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
       if (success) {
         Alert.alert('Success', `Excel report for ${classId} ready for download!`);

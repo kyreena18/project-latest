@@ -48,7 +48,7 @@ export default function BulkImportScreen() {
 
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       
-      const success = await downloadFile(wbout, 'student_import_template.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, 'student_import_template.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
       if (success) {
         Alert.alert('Template Ready', 'Fill in the template with student data and upload it back.');

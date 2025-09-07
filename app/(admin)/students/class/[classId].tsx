@@ -99,8 +99,14 @@ export default function ClassStudentsView() {
         
         // Sort by roll number
         transformedData.sort((a, b) => {
-          const rollA = parseInt(a.roll_no) || 0;
-          const rollB = parseInt(b.roll_no) || 0;
+          // Extract numeric part from roll number for proper sorting
+          const extractNumber = (rollNo: string) => {
+            const match = rollNo.match(/(\d+)$/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          
+          const rollA = extractNumber(a.roll_no);
+          const rollB = extractNumber(b.roll_no);
           return rollA - rollB;
         });
         setStudents(transformedData);
@@ -143,7 +149,7 @@ export default function ClassStudentsView() {
       
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       
-      const success = await downloadFile(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
       if (success) {
         Alert.alert('Success', `Excel report for ${classId} ready for download!`);
