@@ -777,9 +777,18 @@ export default function AdminPlacementsScreen() {
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
                           try {
-                            // Mobile-first implementation
-                            Linking.openURL(application.offer_letter_url);
+                            // Mobile-compatible file viewing
+                            if (Platform.OS === 'web') {
+                              window.open(application.offer_letter_url!, '_blank');
+                            } else {
+                              WebBrowser.openBrowserAsync(application.offer_letter_url!, {
+                                presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+                                showTitle: true,
+                                toolbarColor: '#667eea',
+                              });
+                            }
                           } catch (error) {
+                            console.error('Error opening offer letter:', error);
                             Alert.alert('Error', 'Failed to open offer letter.');
                           }
                         }}

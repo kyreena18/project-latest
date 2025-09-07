@@ -346,10 +346,21 @@ export default function ClassView() {
       let downloadCount = 0;
       for (const fileData of fileUrls) {
         try {
-          await Linking.openURL(fileData.url);
+          // Use WebBrowser for better mobile compatibility
+          if (Platform.OS === 'web') {
+            window.open(fileData.url, '_blank');
+          } else {
+            await WebBrowser.openBrowserAsync(fileData.url, {
+              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+              showTitle: true,
+              toolbarColor: '#667eea',
+            });
+          }
           downloadCount++;
           // Small delay between opening files
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          if (downloadCount < fileUrls.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         } catch (error) {
           console.error(`Failed to open file for ${fileData.studentName}:`, error);
         }

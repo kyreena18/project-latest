@@ -55,25 +55,73 @@ export default function AdminStudentsScreen() {
         return;
       }
 
-      // Real Supabase query
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('student_profiles')
-        .select('id, full_name, uid, roll_no, class')
+      // Real Supabase query - Get all students with their classes
+      const { data: studentsData, error: studentsError } = await supabase
+        .from('students')
+        .select('id, name, uid, roll_no, class')
         .not('class', 'is', null)
         .order('class')
         .order('roll_no');
 
-      if (profilesError) throw profilesError;
+      if (studentsError) {
+        console.error('Error loading students:', studentsError);
+        // Try student_profiles as fallback
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('student_profiles')
+          .select('id, full_name, uid, roll_no, class')
+          .not('class', 'is', null)
+          .order('class')
+          .order('roll_no');
+        
+        if (profilesError) throw profilesError;
+        
+        // Count students by class from profiles
+        const classCounts = (profilesData || []).reduce((acc: { [key: string]: number }, student) => {
+          const className = student.class;
+          acc[className] = (acc[className] || 0) + 1;
+          return acc;
+        }, {});
+        
+        // Sort students by roll number within each class
+        const sortedStudents = (profilesData || []).sort((a, b) => {
+          if (a.class !== b.class) {
+            return a.class.localeCompare(b.class);
+          }
+          return a.roll_no.localeCompare(b.roll_no);
+        });
+
+        setStudents(sortedStudents.map(p => ({
+          ...p,
+          name: p.full_name
+        })));
+        
+        const classDefinitions = [
+          { className: 'TYIT', displayName: 'Third Year IT', description: 'Information Technology - Final Year', color: '#007AFF' },
+          { className: 'TYSD', displayName: 'Third Year Software Development', description: 'Software Development - Final Year', color: '#34C759' },
+          { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
+          { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
+        ];
+
+        const statsWithCounts = classDefinitions.map(classDef => ({
+          ...classDef,
+          studentCount: classCounts[classDef.className] || 0
+        }));
+
+        setClassStats(statsWithCounts);
+        setTotalStudents(Object.values(classCounts).reduce((sum: number, count: number) => sum + count, 0));
+        setLoading(false);
+        return;
+      }
 
       // Count students by class
-      const classCounts = (profilesData || []).reduce((acc: { [key: string]: number }, student) => {
+      const classCounts = (studentsData || []).reduce((acc: { [key: string]: number }, student) => {
         const className = student.class;
         acc[className] = (acc[className] || 0) + 1;
         return acc;
       }, {});
 
       // Sort students by roll number within each class
-      const sortedStudents = (profilesData || []).sort((a, b) => {
+      const sortedStudents = (studentsData || []).sort((a, b) => {
         if (a.class !== b.class) {
           return a.class.localeCompare(b.class);
         }
