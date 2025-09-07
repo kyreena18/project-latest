@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
@@ -193,7 +194,11 @@ export default function AdminPlacementsScreen() {
               let downloadCount = 0;
               for (const application of acceptedWithOfferLetters) {
                 try {
-                  await Linking.openURL(application.offer_letter_url!);
+                  await openBrowserAsync(application.offer_letter_url!, {
+                    presentationStyle: WebBrowserPresentationStyle.FULL_SCREEN,
+                    showTitle: true,
+                    toolbarColor: '#667eea',
+                  });
                   downloadCount++;
                   // Small delay between downloads
                   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -775,7 +780,19 @@ export default function AdminPlacementsScreen() {
                     {application.application_status === 'accepted' && application.offer_letter_url && (
                       <TouchableOpacity
                         style={styles.viewOfferLetterButton}
-                        onPress={() => viewOfferLetter(application.offer_letter_url!)}
+                        onPress={() => {
+                          try {
+                            // Mobile-compatible file viewing
+                            openBrowserAsync(application.offer_letter_url!, {
+                              presentationStyle: WebBrowserPresentationStyle.FULL_SCREEN,
+                              showTitle: true,
+                              toolbarColor: '#667eea',
+                            });
+                          } catch (error) {
+                            console.error('Error opening offer letter:', error);
+                            Alert.alert('Error', 'Failed to open offer letter.');
+                          }
+                        }}
                       >
                         <FileText size={16} color="#34C759" />
                         <Text style={styles.viewOfferLetterText}>View Offer Letter</Text>

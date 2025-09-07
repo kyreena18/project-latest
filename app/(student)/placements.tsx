@@ -1,37 +1,34 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as ExpoLinking from 'expo-linking';
-import { Briefcase, Calendar, Building, Users, FileText, Upload, X, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, Bell } from 'lucide-react-native';
+import { Plus, Briefcase, Eye, X, User, Download, FileText } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatDate, getStatusColor, getRequirementLabel } from '@/lib/utils';
-import * as DocumentPicker from 'expo-document-picker';
+import { formatDate, getStatusColor } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
-// Create a cross-platform Linking object
-const Linking = {
-  openURL: (url: string) => {
-    if (Platform.OS === 'web') {
-      return WebBrowser.openBrowserAsync(url);
-    } else {
-      return ExpoLinking.openURL(url);
-    }
-  }
-};
+// Only import web-specific libraries on web platform
+let JSZip: any = null;
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  JSZip = require('jszip');
+  FileSaver = require('file-saver');
+}
 
 interface PlacementEvent {
   id: string;
   title: string;
   description: string;
   company_name: string;
-  event_date: string;
-  application_deadline: string;
   requirements: string;
   eligible_classes: string[];
-  additional_requirements: { type: string; required: boolean }[];
-  bucket_name: string;
+  additional_requirements?: { type: string; required: boolean }[];
+  bucket_name?: string;
+  event_date?: string;
+  application_deadline?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -39,753 +36,765 @@ interface PlacementEvent {
 interface PlacementApplication {
   id: string;
   placement_event_id: string;
+  student_id: string;
   application_status: 'pending' | 'applied' | 'accepted' | 'rejected';
   applied_at: string;
   admin_notes?: string;
+  student_requirement_submissions?: {
+    id: string;
+    requirement_id: string;
+    file_url: string;
+    submission_status: string;
+    placement_requirements: {
+      type: string;
+      description: string;
+    };
+  }[];
+  students: {
+    name: string;
+    email: string;
+    uid: string;
+    roll_no: string;
+    student_profiles: {
+      full_name: string;
+      class: string;
+      resume_url?: string;
+    } | null;
+  };
 }
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'placement' | 'internship' | 'general';
-  created_at: string;
-  read_by: string[];
-}
-
-export default function PlacementsScreen() {
+export default function AdminPlacementsScreen() {
   const { user } = useAuth();
   const [events, setEvents] = useState<PlacementEvent[]>([]);
   const [applications, setApplications] = useState<PlacementApplication[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState<string | null>(null);
-  const [studentClass, setStudentClass] = useState<string>('');
-  const [showRequirementsModal, setShowRequirementsModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showApplicationsModal, setShowApplicationsModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<PlacementEvent | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null);
-  const [submittedRequirements, setSubmittedRequirements] = useState<{[key: string]: boolean}>({});
-  const [requirementUrls, setRequirementUrls] = useState<{ [key: string]: string }>({});
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const uploadOfferLetter = async (eventId: string, applicationId: string) => {
-    if (!user?.id) return;
-
-    try {
-      setUploading(`offer_${applicationId}`);
-
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]) {
-        setUploading(null);
-        return;
-      }
-
-      const file = result.assets[0];
-      const fileExtension = file.name.split('.').pop() || 'pdf';
-      const fileName = `${user.id}_offer_letter_${Date.now()}.${fileExtension}`;
-
-      // Check if Supabase is configured
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
-        // Mock upload for development
-        Alert.alert('Demo Mode', 'Offer letter would be uploaded (Demo mode)');
-        setUploading(null);
-        return;
-      }
-
-      // Upload to placement-offers bucket
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
-
-      const { error: uploadError } = await supabase.storage
-        .from('placement-offer-letters')
-        .upload(fileName, blob, {
-          contentType: file.mimeType || 'application/pdf',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        Alert.alert('Upload Failed', 'Could not upload offer letter.');
-        setUploading(null);
-        return;
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('placement-offer-letters')
-        .getPublicUrl(fileName);
-
-      const fileUrl = urlData?.publicUrl || '';
-
-      // Update application with offer letter URL
-      const { error } = await supabase
-        .from('placement_applications')
-        .update({ offer_letter_url: fileUrl })
-        .eq('id', applicationId);
-
-      if (error) {
-        console.error('Database update error:', error);
-        Alert.alert('Error', 'Failed to save offer letter URL.');
-        setUploading(null);
-        return;
-      }
-
-      Alert.alert('Success', 'Offer letter uploaded successfully!');
-      loadMyApplications(); // Refresh applications to show updated status
-    } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload offer letter. Please try again.');
-    } finally {
-      setUploading(null);
-    }
-  };
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    description: '',
+    company_name: '',
+    requirements: '',
+    eligible_classes: [] as string[],
+    additional_requirements: [] as { type: string; required: boolean }[],
+  });
 
   useEffect(() => {
-    const initializeData = async () => {
-      await loadStudentClass();
-    };
-    initializeData();
-  }, [user]);
-
-  useEffect(() => {
-    if (studentClass) {
-      loadPlacementEvents();
-      loadMyApplications();
-      loadNotifications();
-      setupRealtimeSubscriptions();
-    }
-  }, [studentClass]);
-
-  // Reload submitted requirements whenever the student's applications change
-  useEffect(() => {
-    if (!user?.id) return;
-    loadSubmittedRequirements();
-  }, [applications, user?.id]);
-
-  const loadStudentClass = async () => {
-    if (!user?.id) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('student_profiles')
-        .select('class')
-        .eq('student_id', user.id)
-        .single();
-
-      if (data?.class) {
-        setStudentClass(data.class);
-      } else {
-        // Default to TYIT for demo if no class found
-        setStudentClass('TYIT');
-      }
-    } catch (error) {
-      console.error('Error loading student class:', error);
-      setStudentClass('TYIT');
-    }
-  };
-
-  const loadNotifications = async () => {
-    try {
-      // Check if Supabase is configured
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-      if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
-        // Mock data for development
-        setNotifications([]);
-        setUnreadNotifications(0);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('is_active', true)
-        .or(`type.eq.placement,type.eq.general`)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.error('Error loading notifications:', error);
-        setNotifications([]);
-        setUnreadNotifications(0);
-        return;
-      }
-      
-      const notificationData = data || [];
-      setNotifications(notificationData);
-      
-      // Count unread notifications
-      const unread = notificationData.filter(notification => 
-        !notification.read_by.includes(user?.id || '')
-      ).length;
-      setUnreadNotifications(unread);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
-    }
-  };
-
-  const setupRealtimeSubscriptions = () => {
-    if (!user?.id) return;
-
-    // Subscribe to notifications
-    const notificationsChannel = supabase
-      .channel('placement-notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-        },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    // Subscribe to placement events
-    const eventsChannel = supabase
-      .channel('placement-events-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'placement_events',
-        },
-        () => {
-          loadPlacementEvents();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      notificationsChannel.unsubscribe();
-      eventsChannel.unsubscribe();
-    };
-  };
+    loadPlacementEvents();
+  }, []);
 
   const loadPlacementEvents = async () => {
     try {
-      const { data: eventsData, error } = await supabase
+      const { data, error } = await supabase
         .from('placement_events')
-        .select(`
-          *,
-          placement_requirements (
-            id,
-            type,
-            description,
-            is_required
-          )
-        `)
-        .eq('is_active', true)
-        .order('event_date', { ascending: true });
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // Filter events based on student's class
-      const filteredEvents = (eventsData || []).filter(event => {
-        // If no eligible_classes specified, show to all students
-        if (!event.eligible_classes || event.eligible_classes.length === 0) {
-          return true;
-        }
-        // Check if student's class is in eligible classes
-        return event.eligible_classes.includes(studentClass);
-      }).map(event => ({
-        ...event,
-        additional_requirements: event.placement_requirements?.map((req: any) => ({
-          type: req.type,
-          required: req.is_required
-        })) || []
-      }));
-
-      setEvents(filteredEvents);
+      setEvents(data || []);
     } catch (error) {
       console.error('Error loading placement events:', error);
-      setEvents([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSubmittedRequirements = async () => {
-    if (!user?.id) return;
-
-    try {
-      // Collect this student's application IDs to fetch their submissions
-      const applicationIds = applications.map(app => app.id);
-
-      if (applicationIds.length === 0) {
-        setSubmittedRequirements({});
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('student_requirement_submissions')
-        .select(`
-          file_url,
-          placement_application_id,
-          requirement_id,
-          placement_requirements (
-            type,
-            event_id
-          )
-        `)
-        .in('placement_application_id', applicationIds);
-
-      if (error) throw error;
-
-      const submitted: { [key: string]: boolean } = {};
-      const urls: { [key: string]: string } = {};
-      (data || []).forEach((submission: any) => {
-        const rel = submission.placement_requirements;
-        if (rel?.event_id && rel?.type) {
-          const key = `${rel.event_id}_${rel.type}`;
-          submitted[key] = true;
-          if (submission.file_url) {
-            urls[key] = submission.file_url;
-          }
-        }
-      });
-
-      setSubmittedRequirements(submitted);
-      setRequirementUrls(urls);
-    } catch (error) {
-      console.error('Error loading submitted requirements:', error);
-    }
-  };
-
-  const loadMyApplications = async () => {
-    if (!user?.id) return;
-
+  const loadEventApplications = async (eventId: string) => {
     try {
       const { data, error } = await supabase
         .from('placement_applications')
-        .select('*')
-        .eq('student_id', user.id);
+        .select(`
+          *,
+          students!inner (
+            name, 
+            email, 
+            uid, 
+            roll_no,
+            student_profiles (
+              full_name,
+              class,
+              resume_url
+            )
+          ),
+          student_requirement_submissions (
+            id,
+            requirement_id,
+            file_url,
+            submission_status,
+            placement_requirements (
+              type,
+              description
+            )
+          )
+        `)
+        .eq('placement_event_id', eventId)
+        .order('applied_at', { ascending: false });
 
       if (error) throw error;
       setApplications(data || []);
     } catch (error) {
       console.error('Error loading applications:', error);
-      setApplications([]);
+      // Mock data for development
+      const mockApplications: PlacementApplication[] = [
+        {
+          id: '1',
+          placement_event_id: eventId,
+          student_id: '1',
+          application_status: 'applied',
+          applied_at: new Date().toISOString(),
+          admin_notes: '',
+          students: {
+            name: 'John Doe',
+            email: 'john@college.edu',
+            uid: 'TYIT001',
+            roll_no: 'TYIT001',
+            student_profiles: {
+              full_name: 'John Doe',
+              class: 'TYIT',
+              resume_url: 'https://example.com/resume1.pdf'
+            }
+      if (Platform.OS === 'web') {
+        window.open(url, '_blank');
+      } else {
+        await WebBrowser.openBrowserAsync(url, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+          showTitle: true,
+          toolbarColor: '#667eea',
+        });
+      }
+        }
+      ];
+      setApplications(mockApplications);
     }
   };
 
-  const applyForPlacement = async (eventId: string) => {
-    if (!user?.id) {
-      Alert.alert('Error', 'Please log in to apply.');
-      return;
-    }
-
-    if (hasAcceptedOffer) {
-      Alert.alert('Not Eligible', 'You have already been accepted for a placement. You are not eligible to apply for further events.');
-      return;
-    }
-
+  const downloadPlacementDocuments = async (event: PlacementEvent) => {
     try {
-      setApplying(eventId);
-
-      const { error } = await supabase
-        .from('placement_applications')
-        .insert({
-          placement_event_id: eventId,
-          student_id: user.id,
-          application_status: 'applied',
-        });
-
-      if (error) {
-        if (error.code === '23505') {
-          Alert.alert('Already Applied', 'You have already applied for this placement.');
-          return;
-        }
-        throw error;
+      // Load applications for this event if not already loaded
+      if (!applications.length || applications[0]?.placement_event_id !== event.id) {
+        await loadEventApplications(event.id);
       }
 
-      Alert.alert('Success', 'Application submitted successfully!');
-      loadMyApplications();
+      // Filter accepted applications with offer letters
+      const acceptedWithOfferLetters = applications.filter(app => 
+        app.application_status === 'accepted' && app.offer_letter_url
+      );
+
+      if (acceptedWithOfferLetters.length === 0) {
+        Alert.alert('No Documents', 'No offer letters found for accepted students.');
+        return;
+      }
+
+            }
+          }
+        ]
+      );
     } catch (error) {
-      console.error('Application error:', error);
-      Alert.alert('Error', 'Failed to submit application.');
-    } finally {
-      setApplying(null);
+      console.error('Bulk download error:', error);
+      Alert.alert('Error', 'Failed to download offer letters.');
     }
   };
 
-  const getApplicationStatus = (eventId: string) => {
-    return applications.find(app => app.placement_event_id === eventId);
+  const downloadPlacementDocumentsMobile = async (event: PlacementEvent) => {
+    try {
+      // Load applications for this event if not already loaded
+      if (!applications.length || applications[0]?.placement_event_id !== event.id) {
+        await loadEventApplications(event.id);
+      }
+
+      // Filter accepted applications with offer letters
+      const acceptedWithOfferLetters = applications.filter(app => 
+        app.application_status === 'accepted' && app.offer_letter_url
+      );
+
+      if (acceptedWithOfferLetters.length === 0) {
+        Alert.alert('No Documents', 'No offer letters found for accepted students.');
+        return;
+      }
+
+      // For mobile, open each document individually
+      let downloadCount = 0;
+
+      for (const application of acceptedWithOfferLetters) {
+        try {
+          await Linking.openURL(application.offer_letter_url!);
+          downloadCount++;
+          // Small delay between opening files
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (error) {
+          console.error(`Failed to download offer letter for ${application.students.name}:`, error);
+        }
+      }
+
+      Alert.alert('Success', `Opened ${downloadCount} offer letters for download`);
+    } catch (error) {
+      console.error('Bulk download error:', error);
+      Alert.alert('Error', 'Failed to download offer letters.');
+    }
   };
-  const hasAcceptedOffer = applications.some(app => app.application_status === 'accepted');
-  const uploadRequirement = async (eventId: string, requirementType: string, bucketName: string) => {
-    if (!user?.id) return;
+
+  const createPlacementEvent = async () => {
+    if (!newEvent.title || !newEvent.company_name) {
+      Alert.alert('Error', 'Please fill in title and company name');
+      return;
+    }
 
     try {
-      setUploading(requirementType);
+      setCreating(true);
 
-      // Use expo-document-picker to select file
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*', 'video/*'],
-        copyToCacheDirectory: true,
+      // Create storage bucket for the company
+      const bucketName = `${newEvent.company_name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
+      
+      const { error: bucketError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        allowedMimeTypes: ['application/pdf', 'video/*', 'image/*'],
+        fileSizeLimit: 10485760, // 10MB
       });
 
-      if (result.canceled || !result.assets?.[0]) {
-        setUploading(null);
-        return;
+      if (bucketError) {
+        console.warn('Bucket creation warning:', bucketError);
+        // Continue even if bucket creation fails
       }
 
-      const file = result.assets[0];
-      const fileExtension = file.name.split('.').pop() || 'pdf';
-      const fileName = `${user.id}_${requirementType}_${Date.now()}.${fileExtension}`;
-
-      // Upload file to Supabase storage
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
-
-      // Upload to placement-offer-letters bucket for offer letters
-      const targetBucket = 'placement-offer-letters';
-      const { error: uploadError } = await supabase.storage
-        .from(targetBucket)
-        .upload(fileName, blob, {
-          contentType: file.mimeType || 'application/pdf',
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        Alert.alert('Upload Failed', `Could not upload ${getRequirementLabel(requirementType)}.`);
-        return;
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from(targetBucket)
-        .getPublicUrl(fileName);
-
-      const fileUrl = urlData?.publicUrl || '';
-
-      // Get the application for this event
-      const application = applications.find(app => app.placement_event_id === eventId);
-      if (!application) {
-        Alert.alert('Error', 'Please apply for this placement first before uploading requirements.');
-        return;
-      }
-
-      // Get the placement requirement record
-      const { data: requirementData, error: reqError } = await supabase
-        .from('placement_requirements')
-        .select('id')
-        .eq('event_id', eventId)
-        .eq('type', requirementType)
+      const { data: eventData, error } = await supabase
+        .from('placement_events')
+        .insert({
+          title: newEvent.title,
+          description: newEvent.description,
+          company_name: newEvent.company_name,
+          requirements: newEvent.requirements,
+          eligible_classes: newEvent.eligible_classes,
+          additional_requirements: newEvent.additional_requirements,
+          bucket_name: bucketName,
+          event_date: new Date().toISOString(),
+          application_deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          is_active: true,
+        })
+        .select()
         .single();
-
-      if (reqError || !requirementData) {
-        throw new Error('Requirement not found');
-      }
-
-      // Store the student's requirement submission
-      const { error } = await supabase
-        .from('student_requirement_submissions')
-        .upsert({
-          placement_application_id: application.id,
-          requirement_id: requirementData.id,
-          file_url: fileUrl,
-          submission_status: 'pending',
-          submitted_at: new Date().toISOString(),
-        }, { onConflict: 'placement_application_id,requirement_id' });
 
       if (error) throw error;
 
-      Alert.alert('Success', `${getRequirementLabel(requirementType)} uploaded successfully!`);
-      
-      // Update local state to reflect the upload
-      const key = `${eventId}_${requirementType}`;
-      setSubmittedRequirements(prev => ({ ...prev, [key]: true }));
-      if (fileUrl) {
-        setRequirementUrls(prev => ({ ...prev, [key]: fileUrl }));
+      // Create placement requirements for each additional requirement
+      if (newEvent.additional_requirements.length > 0 && eventData) {
+        const requirementInserts = newEvent.additional_requirements.map(req => ({
+          event_id: eventData.id,
+          type: req.type,
+          description: `${req.type.replace('_', ' ')} submission`,
+          is_required: req.required,
+        }));
+
+        const { error: reqError } = await supabase
+          .from('placement_requirements')
+          .insert(requirementInserts);
+
+        if (reqError) {
+          console.warn('Requirements creation warning:', reqError);
+        }
       }
+
+      Alert.alert('Success', 'Placement event created successfully!');
+      setShowCreateModal(false);
+      resetForm();
+      
+      // Create notification for students
+      await supabase
+        .from('notifications')
+        .insert({
+          title: 'New Placement Opportunity',
+          message: `A new placement opportunity at ${newEvent.company_name} for "${newEvent.title}" has been posted. Apply now!`,
+          type: 'placement',
+          target_audience: newEvent.eligible_classes.length > 0 ? 'specific_class' : 'all',
+          target_classes: newEvent.eligible_classes,
+          created_by: user?.id,
+          is_active: true,
+        });
+      
+      loadPlacementEvents();
     } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', `Failed to upload ${getRequirementLabel(requirementType)}. Please try again.`);
+      Alert.alert('Error', 'Failed to create placement event');
     } finally {
-      setUploading(null);
+      setCreating(false);
     }
   };
 
-  const viewRequirements = (event: PlacementEvent) => {
+  
+  const resetForm = () => {
+    setNewEvent({
+      title: '',
+      description: '',
+      company_name: '',
+      requirements: '',
+      eligible_classes: [],
+      additional_requirements: [],
+    });
+  };
+
+  const viewApplications = async (event: PlacementEvent) => {
     setSelectedEvent(event);
-    loadSubmittedRequirements();
-    setShowRequirementsModal(true);
+    await loadEventApplications(event.id);
+    setShowApplicationsModal(true);
   };
 
-  const isDeadlinePassed = (deadline: string) => {
-    return new Date(deadline) < new Date();
+  const acceptApplication = async (applicationId: string) => {
+    try {
+      const { error } = await supabase
+        .from('placement_applications')
+        .update({ application_status: 'accepted' })
+        .eq('id', applicationId);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Application marked as accepted');
+      if (selectedEvent?.id) {
+        await loadEventApplications(selectedEvent.id);
+        
+        // Create notification for the student
+        const application = applications.find(app => app.id === applicationId);
+        if (application) {
+          await supabase
+            .from('notifications')
+            .insert({
+              title: `Application ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+              message: `Your application for ${selectedEvent.title} at ${selectedEvent.company_name} has been ${status}.`,
+              type: 'placement',
+              target_audience: 'all', // Will be filtered by student
+              created_by: user?.id,
+              is_active: true,
+            });
+        }
+      }
+    } catch (err) {
+      console.error('Accept application error:', err);
+      Alert.alert('Error', 'Failed to update application status');
+    }
   };
 
-  if (loading) {
-    return (
-      <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading placements...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+  const exportApplicationsToExcel = () => {
+    if (!selectedEvent || applications.length === 0) {
+      Alert.alert('No Data', 'No applications to export');
+      return;
+    }
 
+    try {
+      // Get all additional requirement types from the selected event
+      const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
+
+      const exportData = applications.map((application, index) => ({
+        'S.No': index + 1,
+        'Full Name': application.students?.student_profiles?.full_name || application.students?.name || 'N/A',
+        'UID': application.students?.uid || 'N/A',
+        'Roll Number': application.students?.roll_no || 'N/A',
+        'Email': application.students?.email || 'N/A',
+        'Class': application.students?.student_profiles?.class || 'N/A',
+        'Application Status': application.application_status.toUpperCase(),
+        'Applied Date': formatDate(application.applied_at),
+        'Admin Notes': application.admin_notes || 'No notes',
+        'Resume Link': application.students?.student_profiles?.resume_url || 'Not uploaded',
+        'Offer Letter Link': application.offer_letter_url || (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
+        // Add additional requirement submission links
+        ...additionalRequirementTypes.reduce((acc, type) => {
+          const reqLabel = type.replace('_', ' ').split(' ').map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ');
+          const reqKey = `${reqLabel} Link`;
+          
+          // Find the submission for this additional requirement type
+          const submission = application.student_requirement_submissions?.find(sub => 
+            sub.placement_requirements.type === type
+          );
+          
+          acc[reqKey] = submission?.file_url || 'Not submitted';
+          return acc;
+        }, {} as Record<string, string>),
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      const colWidths = [
+        { wch: 6 },   // S.No
+        { wch: 20 },  // Full Name
+        { wch: 12 },  // UID
+        { wch: 15 },  // Roll Number
+        { wch: 25 },  // Email
+        { wch: 8 },   // Class
+        { wch: 15 },  // Application Status
+        { wch: 12 },  // Applied Date
+        { wch: 15 },  // Admin Notes
+        { wch: 15 },  // Resume Link
+        { wch: 18 },  // Offer Letter Link
+        // Add column widths for additional requirement links
+        ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Applications');
+
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
+
+      // Mobile-first implementation
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const uri = FileSystem.documentDirectory + filename;
+      
+      FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).then(() => {
+        Sharing.shareAsync(uri);
+      }).catch((error) => {
+        console.error('File save error:', error);
+        Alert.alert('Error', 'Failed to save file');
+      });
+
+      Alert.alert('Success', `Excel file downloaded successfully!`);
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Export Failed', 'Could not export applications to Excel');
+    }
+  };
+
+
+  const addAdditionalRequirement = (type: string) => {
+    if (newEvent.additional_requirements.some(req => req.type === type)) {
+      return; // Already added
+    }
+    setNewEvent(prev => ({
+      ...prev,
+      additional_requirements: [...prev.additional_requirements, { type, required: false }]
+    }));
+  };
+
+  const removeAdditionalRequirement = (type: string) => {
+    setNewEvent(prev => ({
+      ...prev,
+      additional_requirements: prev.additional_requirements.filter(req => req.type !== type)
+    }));
+  };
+
+  const toggleRequirementRequired = (type: string) => {
+    setNewEvent(prev => ({
+      ...prev,
+      additional_requirements: prev.additional_requirements.map(req =>
+        req.type === type ? { ...req, required: !req.required } : req
+      )
+    }));
+  };
+
+  const requirementTypes = [
+    { type: 'video_introduction', label: 'Video Introduction' },
+    { type: 'portfolio', label: 'Portfolio' },
+    { type: 'cover_letter', label: 'Cover Letter' },
+    { type: 'certificates', label: 'Certificates' },
+    { type: 'project_demo', label: 'Project Demo' },
+    { type: 'coding_sample', label: 'Coding Sample' },
+  ];
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Placement Opportunities</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Bell size={20} color="#FFFFFF" />
-            {unreadNotifications > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>{unreadNotifications}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={styles.headerStats}>
-            <Text style={styles.headerStatsText}>{events.length} Available</Text>
-          </View>
-        </View>
+        <Text style={styles.headerTitle}>Placement Management</Text>
+        <TouchableOpacity style={styles.createButton} onPress={() => setShowCreateModal(true)}>
+          <Plus size={20} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Notifications Section */}
-        {notifications.length > 0 && (
-          <View style={styles.notificationsSection}>
-            <Text style={styles.sectionTitle}>Recent Notifications</Text>
-            <View style={styles.notificationsList}>
-              {notifications.slice(0, 3).map((notification) => (
-                <View key={notification.id} style={styles.notificationCard}>
-                  <Text style={styles.notificationTitle}>{notification.title}</Text>
-                  <Text style={styles.notificationMessage}>{notification.message}</Text>
-                  <Text style={styles.notificationDate}>
-                    {formatDate(notification.created_at)}
-                  </Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Briefcase size={24} color="#007AFF" />
+            <Text style={styles.statNumber}>{events.length}</Text>
+            <Text style={styles.statLabel}>Active Events</Text>
+          </View>
+        </View>
+
+        <View style={styles.eventsList}>
+          {events.map((event) => (
+            <View key={event.id} style={styles.eventCard}>
+              <View style={styles.eventHeader}>
+                <View style={styles.eventInfo}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <Text style={styles.companyName}>{event.company_name}</Text>
                 </View>
-              ))}
+              </View>
+              
+              <Text style={styles.eventDescription}>{event.description}</Text>
+              <Text style={styles.eventRequirements}>{event.requirements}</Text>
+              
+              <View style={styles.eligibleClasses}>
+                <Text style={styles.eligibleClassesLabel}>Eligible Classes:</Text>
+                <View style={styles.classChips}>
+                  {event.eligible_classes?.map((className) => (
+                    <View key={className} style={styles.classChip}>
+                      <Text style={styles.classChipText}>{className}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <Text style={styles.eventDate}>Created: {formatDate(event.created_at)}</Text>
+              
+              <TouchableOpacity style={styles.viewButton} onPress={() => viewApplications(event)}>
+                <Eye size={16} color="#007AFF" />
+                <Text style={styles.viewButtonText}>View Applications</Text>
+              </TouchableOpacity>
             </View>
-          </View>
-        )}
-
-        {events.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Briefcase size={64} color="#6B6B6B" />
-            <Text style={styles.emptyStateTitle}>No Placements Available</Text>
-            <Text style={styles.emptyStateText}>
-              No placements available for your class ({studentClass})
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.eventsList}>
-            {events.map((event) => {
-              const application = getApplicationStatus(event.id);
-              const deadlinePassed = isDeadlinePassed(event.application_deadline);
-
-              return (
-                <View key={event.id} style={styles.eventCard}>
-                  <View style={styles.eventHeader}>
-                    <View style={styles.companyInfo}>
-                      <Building size={32} color="#007AFF" />
-                      <View style={styles.companyDetails}>
-                        <Text style={styles.companyName}>{event.company_name}</Text>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                      </View>
-                    </View>
-                    {application && (
-                      <View style={[styles.statusBadge, { backgroundColor: getStatusColor(application.application_status) }]}>
-                        <Text style={styles.statusText}>
-                          {application.application_status.toUpperCase()}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <Text style={styles.eventDescription}>{event.description}</Text>
-
-                  <View style={styles.eventDetails}>
-                    <View style={styles.detailItem}>
-                      <Calendar size={16} color="#6B6B6B" />
-                      <Text style={styles.detailText}>
-                        Event: {formatDate(event.event_date)}
-                      </Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Calendar size={16} color="#6B6B6B" />
-                      <Text style={styles.detailText}>
-                        Deadline: {formatDate(event.application_deadline)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.requirementsSection}>
-                    <Text style={styles.requirementsTitle}>Requirements:</Text>
-                    <Text style={styles.requirementsText}>{event.requirements}</Text>
-                  </View>
-
-                  {event.additional_requirements && event.additional_requirements.length > 0 && (
-                    <TouchableOpacity
-                      style={styles.viewRequirementsButton}
-                      onPress={() => viewRequirements(event)}
-                    >
-                      <FileText size={16} color="#007AFF" />
-                      <Text style={styles.viewRequirementsText}>
-                        View Additional Requirements ({event.additional_requirements.length})
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Offer Letter Upload for Accepted Students */}
-                  {application && application.application_status === 'accepted' && (
-                    <View style={styles.offerLetterSection}>
-                      <Text style={styles.offerLetterTitle}>🎉 Congratulations! You've been accepted!</Text>
-                      {application.offer_letter_url ? (
-                        <View style={styles.offerLetterUploaded}>
-                          <Text style={styles.offerLetterUploadedText}>✅ Offer letter uploaded successfully</Text>
-                          <TouchableOpacity
-                            style={styles.reuploadOfferButton}
-                            onPress={() => uploadOfferLetter(event.id, application.id)}
-                            disabled={uploading === `offer_${application.id}`}
-                          >
-                            <Upload size={16} color="#007AFF" />
-                            <Text style={styles.reuploadOfferText}>
-                              {uploading === `offer_${application.id}` ? 'Updating...' : 'Update Offer Letter'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity
-                          style={[styles.uploadOfferButton, uploading === `offer_${application.id}` && styles.disabledButton]}
-                          onPress={() => uploadOfferLetter(event.id, application.id)}
-                          disabled={uploading === `offer_${application.id}`}
-                        >
-                          <Upload size={20} color="#FFFFFF" />
-                          <Text style={styles.uploadOfferButtonText}>
-                            {uploading === `offer_${application.id}` ? 'Uploading...' : 'Upload Offer Letter'}
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                  {application ? (
-                    <View style={styles.appliedSection}>
-                      <Text style={styles.appliedText}>
-                        Applied on {formatDate(application.applied_at)}
-                      </Text>
-                      {application.admin_notes && (
-                        <Text style={styles.adminNotes}>
-                          Notes: {application.admin_notes}
-                        </Text>
-                      )}
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.applyButton,
-                        (deadlinePassed || applying === event.id || hasAcceptedOffer) && styles.disabledButton,
-                      ]}
-                      onPress={() => applyForPlacement(event.id)}
-                      disabled={deadlinePassed || applying === event.id || hasAcceptedOffer}
-                    >
-                      <Users size={20} color="#FFFFFF" />
-                      <Text style={styles.applyButtonText}>
-                        {applying === event.id
-                          ? 'Applying...'
-                          : deadlinePassed
-                          ? 'Deadline Passed'
-                          : hasAcceptedOffer
-                          ? 'Not Eligible (Accepted)'
-                          : 'Apply Now'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-
-            })}
-          </View>
-        )}
+          ))}
+        </View>
       </ScrollView>
 
-      {/* Additional Requirements Modal */}
-      <Modal
-        visible={showRequirementsModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      {/* Create Event Modal */}
+      <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Additional Requirements</Text>
-            <TouchableOpacity onPress={() => setShowRequirementsModal(false)}>
+            <Text style={styles.modalTitle}>Create Placement Event</Text>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)}>
               <X size={24} color="#1C1C1E" />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.modalContent}>
-            {selectedEvent?.additional_requirements?.map((requirement) => (
-              <View key={requirement.type} style={styles.requirementCard}>
-                <View style={styles.requirementHeader}>
-                  <Text style={styles.requirementTitle}>
-                    {getRequirementLabel(requirement.type)}
-                    {requirement.required && <Text style={styles.requiredAsterisk}> *</Text>}
-                  </Text>
-                  {requirement.required && (
-                    <View style={styles.requiredBadge}>
-                      <Text style={styles.requiredText}>Required</Text>
-                    </View>
-                  )}
-                </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Event Title *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., Software Developer Position"
+                value={newEvent.title}
+                onChangeText={(text) => setNewEvent(prev => ({ ...prev, title: text }))}
+              />
+            </View>
 
-                {submittedRequirements[`${selectedEvent.id}_${requirement.type}`] ? (
-                  <View style={styles.submittedSection}>
-                    <View style={styles.submittedIndicator}>
-                      <CheckCircle size={16} color="#34C759" />
-                      <Text style={styles.submittedText}>Submitted</Text>
-                    </View>
-                    {requirementUrls[`${selectedEvent.id}_${requirement.type}`] && (
-                      <TouchableOpacity
-                        style={styles.reuploadButton}
-                        onPress={() => Linking.openURL(requirementUrls[`${selectedEvent.id}_${requirement.type}`])}
-                      >
-                        <FileText size={16} color="#007AFF" />
-                        <Text style={styles.reuploadText}>View</Text>
-                      </TouchableOpacity>
-                    )}
-                    <TouchableOpacity
-                      style={[styles.reuploadButton, uploading === requirement.type && styles.disabledButton]}
-                      onPress={() => uploadRequirement(selectedEvent.id, requirement.type, selectedEvent.bucket_name)}
-                      disabled={uploading === requirement.type}
-                    >
-                      <Upload size={16} color="#007AFF" />
-                      <Text style={styles.reuploadText}>
-                        {uploading === requirement.type ? 'Uploading...' : 'Update'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Company Name *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g., NIQ, Google, Microsoft"
+                value={newEvent.company_name}
+                onChangeText={(text) => setNewEvent(prev => ({ ...prev, company_name: text }))}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Description</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Describe the position..."
+                value={newEvent.description}
+                onChangeText={(text) => setNewEvent(prev => ({ ...prev, description: text }))}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Requirements</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="e.g., Minimum 70% in academics..."
+                value={newEvent.requirements}
+                onChangeText={(text) => setNewEvent(prev => ({ ...prev, requirements: text }))}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Eligible Classes *</Text>
+              <View style={styles.classSelectionContainer}>
+                {['TYIT', 'TYSD', 'SYIT', 'SYSD'].map((className) => (
                   <TouchableOpacity
-                    style={[styles.uploadButton, uploading === requirement.type && styles.disabledButton]}
-                    onPress={() => uploadRequirement(selectedEvent.id, requirement.type, selectedEvent.bucket_name)}
-                    disabled={uploading === requirement.type}
+                    key={className}
+                    style={[
+                      styles.classOption,
+                      newEvent.eligible_classes.includes(className) && styles.classOptionSelected
+                    ]}
+                    onPress={() => {
+                      const updatedClasses = newEvent.eligible_classes.includes(className)
+                        ? newEvent.eligible_classes.filter(c => c !== className)
+                        : [...newEvent.eligible_classes, className];
+                      setNewEvent({ ...newEvent, eligible_classes: updatedClasses });
+                    }}
                   >
-                    <Upload size={16} color="#FFFFFF" />
-                    <Text style={styles.uploadButtonText}>
-                      {uploading === requirement.type ? 'Uploading...' : `Upload ${getRequirementLabel(requirement.type)}`}
+                    <Text style={[
+                      styles.classOptionText,
+                      newEvent.eligible_classes.includes(className) && styles.classOptionTextSelected
+                    ]}>
+                      {className}
                     </Text>
                   </TouchableOpacity>
-                )}
+                ))}
               </View>
-            ))}
+            </View>
 
-            {(!selectedEvent?.additional_requirements || selectedEvent.additional_requirements.length === 0) && (
-              <View style={styles.noRequirements}>
-                <FileText size={48} color="#6B6B6B" />
-                <Text style={styles.noRequirementsText}>No additional requirements for this placement</Text>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Additional Requirements</Text>
+              <Text style={styles.sublabel}>Select documents students need to submit</Text>
+              
+              <View style={styles.requirementTypesContainer}>
+                {requirementTypes.map((reqType) => (
+                  <TouchableOpacity
+                    key={reqType.type}
+                    style={[
+                      styles.requirementTypeOption,
+                      newEvent.additional_requirements.some(req => req.type === reqType.type) && styles.requirementTypeSelected
+                    ]}
+                    onPress={() => {
+                      if (newEvent.additional_requirements.some(req => req.type === reqType.type)) {
+                        removeAdditionalRequirement(reqType.type);
+                      } else {
+                        addAdditionalRequirement(reqType.type);
+                      }
+                    }}
+                  >
+                    <Text style={[
+                      styles.requirementTypeText,
+                      newEvent.additional_requirements.some(req => req.type === reqType.type) && styles.requirementTypeTextSelected
+                    ]}>
+                      {reqType.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {newEvent.additional_requirements.length > 0 && (
+                <View style={styles.selectedRequirements}>
+                  <Text style={styles.selectedRequirementsTitle}>Selected Requirements:</Text>
+                  {newEvent.additional_requirements.map((req) => (
+                    <View key={req.type} style={styles.selectedRequirement}>
+                      <Text style={styles.selectedRequirementText}>
+                        {requirementTypes.find(rt => rt.type === req.type)?.label || req.type}
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.requiredToggle, req.required && styles.requiredToggleActive]}
+                        onPress={() => toggleRequirementRequired(req.type)}
+                      >
+                        <Text style={[styles.requiredToggleText, req.required && styles.requiredToggleTextActive]}>
+                          {req.required ? 'Required' : 'Optional'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeRequirement}
+                        onPress={() => removeAdditionalRequirement(req.type)}
+                      >
+                        <X size={16} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.createEventButton, creating && styles.disabledButton]}
+              onPress={createPlacementEvent}
+              disabled={creating}
+            >
+              <Text style={styles.createEventButtonText}>
+                {creating ? 'Creating...' : 'Create Event'}
+              </Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Applications Modal */}
+      <Modal visible={showApplicationsModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>
+              {selectedEvent ? `${selectedEvent.company_name} - Applications` : 'Applications'}
+            </Text>
+            <TouchableOpacity onPress={() => setShowApplicationsModal(false)}>
+              <X size={24} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {applications.length === 0 ? (
+              <View style={styles.emptyApplications}>
+                <Text style={styles.emptyText}>No Applications Yet</Text>
+              </View>
+            ) : (
+              <View style={styles.applicationsList}>
+                <TouchableOpacity style={styles.exportButton} onPress={exportApplicationsToExcel}>
+                  <Download size={16} color="#34C759" />
+                  <Text style={styles.exportButtonText}>Export to Excel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.bulkDownloadButton}
+                  onPress={() => downloadPlacementDocuments(selectedEvent!)}
+                >
+                  <Download size={16} color="#FFFFFF" />
+                  <Text style={styles.bulkDownloadButtonText}>Download Offer Letters</Text>
+                </TouchableOpacity>
+
+                {applications.map((application) => (
+                  <View key={application.id} style={styles.applicationCard}>
+                    <View style={styles.applicationHeader}>
+                      <View style={styles.studentInfo}>
+                        <User size={20} color="#007AFF" />
+                        <View style={styles.studentDetails}>
+                          <Text style={styles.studentName}>
+                            {application.students?.student_profiles?.full_name || application.students?.name || 'Unknown'}
+                          </Text>
+                          <Text style={styles.studentMeta}>
+                            {application.students?.uid || 'N/A'} • {application.students?.roll_no || 'N/A'}
+                          </Text>
+                          <Text style={styles.studentEmail}>{application.students?.email || 'N/A'}</Text>
+                          <Text style={styles.studentClass}>
+                            Class: {application.students?.student_profiles?.class || 'N/A'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={[styles.applicationStatus, { backgroundColor: getStatusColor(application.application_status) }]}>
+                        <Text style={styles.applicationStatusText}>
+                          {application.application_status.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.appliedDate}>Applied: {formatDate(application.applied_at)}</Text>
+
+                    {/* View Offer Letter Button for Accepted Students */}
+                    {application.application_status === 'accepted' && application.offer_letter_url && (
+                      <TouchableOpacity
+                        style={styles.viewOfferLetterButton}
+                        onPress={() => {
+                          try {
+                            // Mobile-compatible file viewing
+                            if (Platform.OS === 'web') {
+                              window.open(application.offer_letter_url!, '_blank');
+                            } else {
+                              WebBrowser.openBrowserAsync(application.offer_letter_url!, {
+                                presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+                                showTitle: true,
+                                toolbarColor: '#667eea',
+                              });
+                            }
+                          } catch (error) {
+                            console.error('Error opening offer letter:', error);
+                            Alert.alert('Error', 'Failed to open offer letter.');
+                          }
+                        }}
+                      >
+                        <FileText size={16} color="#34C759" />
+                        <Text style={styles.viewOfferLetterText}>View Offer Letter</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {application.application_status !== 'accepted' && (
+                      <TouchableOpacity
+                        style={styles.acceptButton}
+                        onPress={() => acceptApplication(application.id)}
+                      >
+                        <Text style={styles.acceptButtonText}>Mark as Accepted</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
               </View>
             )}
           </ScrollView>
@@ -812,127 +821,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  notificationButton: {
-    position: 'relative',
+  createButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 8,
-    padding: 8,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  notificationBadgeText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  headerStats: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  headerStatsText: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    padding: 12,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
-  notificationsSection: {
+  statsContainer: {
     marginBottom: 24,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 12,
-  },
-  notificationsList: {
-    gap: 12,
-  },
-  notificationCard: {
+  statCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1C1C1E',
-    marginBottom: 4,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: '#6B6B6B',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  notificationDate: {
-    fontSize: 12,
-    color: '#6B6B6B',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  emptyState: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 40,
-    alignItems: 'center',
-    marginTop: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
-  emptyStateTitle: {
-    fontSize: 20,
+  statNumber: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1C1C1E',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 8,
+    marginBottom: 4,
   },
-  emptyStateText: {
-    fontSize: 16,
+  statLabel: {
+    fontSize: 12,
     color: '#6B6B6B',
     textAlign: 'center',
   },
   eventsList: {
-    gap: 20,
+    gap: 16,
     paddingBottom: 40,
   },
   eventCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -944,131 +874,77 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: 8,
   },
-  companyInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  eventInfo: {
     flex: 1,
   },
-  companyDetails: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  companyName: {
+  eventTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#1C1C1E',
     marginBottom: 4,
   },
-  eventTitle: {
+  companyName: {
     fontSize: 16,
-    color: '#6B6B6B',
+    color: '#007AFF',
+    fontWeight: '600',
   },
-  statusBadge: {
+  
+  eventDescription: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  eventRequirements: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    marginBottom: 12,
+  },
+  eligibleClasses: {
+    marginBottom: 12,
+  },
+  eligibleClassesLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 8,
+  },
+  classChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  classChip: {
+    backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  statusText: {
+  classChipText: {
     fontSize: 12,
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  eventDescription: {
-    fontSize: 14,
-    color: '#1C1C1E',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  eventDetails: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
+  eventDate: {
+    fontSize: 12,
     color: '#6B6B6B',
-  },
-  requirementsSection: {
-    marginBottom: 20,
-  },
-  requirementsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
-  requirementsText: {
-    fontSize: 14,
-    color: '#6B6B6B',
-    lineHeight: 20,
-  },
-  appliedSection: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    padding: 16,
-  },
-  appliedText: {
-    fontSize: 14,
-    color: '#34C759',
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  adminNotes: {
-    fontSize: 14,
-    color: '#6B6B6B',
-    fontStyle: 'italic',
     marginBottom: 12,
   },
-  offerLetterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#34C759',
-    borderRadius: 8,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  offerLetterButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  applyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  disabledButton: {
-    backgroundColor: '#C7C7CC',
-  },
-  applyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  viewRequirementsButton: {
+  viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
     borderRadius: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     gap: 8,
-    marginBottom: 16,
   },
-  viewRequirementsText: {
-    fontSize: 14,
+  viewButtonText: {
     color: '#007AFF',
+    fontSize: 14,
     fontWeight: '600',
   },
   modalContainer: {
@@ -1095,144 +971,277 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  requirementCard: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+  formGroup: {
+    marginBottom: 20,
   },
-  requirementHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  requirementTitle: {
+  label: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
+    marginBottom: 8,
   },
-  requiredAsterisk: {
-    color: '#FF3B30',
-  },
-  requiredBadge: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  requiredText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+  input: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
+    fontSize: 16,
+    color: '#1C1C1E',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  classSelectionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  uploadButtonText: {
+  classOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  classOptionSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  classOptionText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  noRequirements: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  noRequirementsText: {
-    fontSize: 16,
     color: '#6B6B6B',
-    marginTop: 16,
-    textAlign: 'center',
+    fontWeight: '500',
   },
-  submittedSection: {
+  classOptionTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  sublabel: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    marginBottom: 12,
+  },
+  requirementTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  requirementTypeOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  requirementTypeSelected: {
+    backgroundColor: '#34C759',
+    borderColor: '#34C759',
+  },
+  requirementTypeText: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
+  requirementTypeTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  selectedRequirements: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+  },
+  selectedRequirementsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 12,
+  },
+  selectedRequirement: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
-  submittedIndicator: {
+  selectedRequirementText: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    flex: 1,
+  },
+  requiredToggle: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginHorizontal: 8,
+  },
+  requiredToggleActive: {
+    backgroundColor: '#FF3B30',
+  },
+  requiredToggleText: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
+  requiredToggleTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  removeRequirement: {
+    padding: 4,
+  },
+  createEventButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  createEventButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyApplications: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+  },
+  applicationsList: {
+    gap: 16,
+    paddingBottom: 40,
+  },
+  exportButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FFF4',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#34C759',
     gap: 8,
   },
-  submittedText: {
+  exportButtonText: {
     fontSize: 14,
     color: '#34C759',
     fontWeight: '600',
   },
-  reuploadButton: {
+  bulkDownloadButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#AF52DE',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    marginTop: 8,
   },
-  reuploadText: {
+  bulkDownloadButtonText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#FFFFFF',
     fontWeight: '600',
   },
-  offerLetterSection: {
-    backgroundColor: '#E8F5E8',
+  disabledButton: {
+    backgroundColor: '#C7C7CC',
+  },
+  applicationCard: {
+    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     padding: 16,
-    marginTop: 16,
-    borderWidth: 2,
-    borderColor: '#34C759',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
-  offerLetterTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#34C759',
+  applicationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: 12,
-    textAlign: 'center',
   },
-  offerLetterUploaded: {
-    alignItems: 'center',
+  studentInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
     gap: 12,
   },
-  offerLetterUploadedText: {
+  studentDetails: {
+    flex: 1,
+  },
+  studentName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  studentMeta: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    marginBottom: 2,
+  },
+  studentEmail: {
+    fontSize: 14,
+    color: '#007AFF',
+    marginBottom: 2,
+  },
+  studentClass: {
+    fontSize: 14,
+    color: '#6B6B6B',
+    fontWeight: '500',
+  },
+  applicationStatus: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  applicationStatusText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  appliedDate: {
+    fontSize: 12,
+    color: '#6B6B6B',
+    marginBottom: 8,
+  },
+  viewOfferLetterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FFF4',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#34C759',
+    gap: 8,
+  },
+  viewOfferLetterText: {
     fontSize: 14,
     color: '#34C759',
     fontWeight: '600',
   },
-  reuploadOfferButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  reuploadOfferText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  uploadOfferButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  acceptButton: {
+    marginTop: 8,
     backgroundColor: '#34C759',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
   },
-  uploadOfferButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  acceptButtonText: {
     color: '#FFFFFF',
+    fontWeight: '600',
   },
 });
