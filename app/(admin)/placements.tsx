@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Building, Calendar, Users, X, CreditCard as Edit, Trash2, Eye, FileText, Download, ExternalLink, Briefcase, User } from 'lucide-react-native';
+import { Plus, X, Download, FileText, Eye, Briefcase, User } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
-import { formatDate, getStatusColor, downloadFileWithFallback } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { formatDate, getStatusColor } from '@/lib/utils';
 import * as WebBrowser from 'expo-web-browser';
-import { downloadFile } from '@/lib/utils';
 
 interface PlacementEvent {
   id: string;
@@ -33,6 +32,7 @@ interface PlacementApplication {
   application_status: 'pending' | 'applied' | 'accepted' | 'rejected';
   applied_at: string;
   admin_notes?: string;
+  offer_letter_url?: string | null;
   student_requirement_submissions?: {
     id: string;
     requirement_id: string;
@@ -97,6 +97,7 @@ export default function AdminPlacementsScreen() {
     }
   };
 
+  // Return loaded applications and set state
   const loadEventApplications = async (eventId: string) => {
     try {
       const { data, error } = await supabase
@@ -129,10 +130,12 @@ export default function AdminPlacementsScreen() {
         .order('applied_at', { ascending: false });
 
       if (error) throw error;
-      setApplications(data || []);
+      const apps = data || [];
+      setApplications(apps);
+      return apps;
     } catch (error) {
       console.error('Error loading applications:', error);
-      // Mock data for development
+      // Provide a mock fallback to keep UI usable (development)
       const mockApplications: PlacementApplication[] = [
         {
           id: '1',
@@ -141,6 +144,7 @@ export default function AdminPlacementsScreen() {
           application_status: 'applied',
           applied_at: new Date().toISOString(),
           admin_notes: '',
+          offer_letter_url: null,
           students: {
             name: 'John Doe',
             email: 'john@college.edu',
@@ -155,51 +159,206 @@ export default function AdminPlacementsScreen() {
         }
       ];
       setApplications(mockApplications);
+      return mockApplications;
     }
   };
 
-  const downloadPlacementDocuments = async (event: PlacementEvent) => {
+  // Save base64 content to file and share - mobile & web fallback
+  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
     try {
-      // Load applications for this event if not already loaded
-      if (!applications.length || applications[0]?.placement_event_id !== event.id) {
-        await loadEventApplications(event.id);
+      if (Platform.OS === 'web') {
+        const link = document.createElement('a');
+        link.href = `data:${mime};base64,${base64Data}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return true;
       }
 
-      // Filter accepted applications with offer letters
-      const acceptedWithOfferLetters = applications.filter(app => 
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share file' });
+        return true;
+      } else {
+        Alert.alert('Saved', `File saved to ${fileUri}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('saveAndShareBase64 error:', err);
+      return false;
+    }
+  };
+
+  // Save text content (UTF-8) and share
+  const saveAndShareText = async (content: string, filename: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return true;
+      }
+
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Share text file' });
+        return true;
+      } else {
+        Alert.alert('Saved', `File saved to ${fileUri}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('saveAndShareText error:', err);
+      return false;
+    }
+  };
+
+  // Export applications to Excel for selectedEvent
+  const exportApplicationsToExcel = async () => {
+    if (!selectedEvent || applications.length === 0) {
+      Alert.alert('No Data', 'No applications to export');
+      return;
+    }
+
+    try {
+      setDownloading(`excel_${selectedEvent.id}`);
+
+      const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
+
+      const exportData = applications.map((application, index) => ({
+        'S.No': index + 1,
+        'Full Name': application.students?.student_profiles?.full_name || application.students?.name || 'N/A',
+        'UID': application.students?.uid || 'N/A',
+        'Roll Number': application.students?.roll_no || 'N/A',
+        'Email': application.students?.email || 'N/A',
+        'Class': application.students?.student_profiles?.class || 'N/A',
+        'Application Status': application.application_status ? application.application_status.toUpperCase() : 'N/A',
+        'Applied Date': formatDate(application.applied_at),
+        'Admin Notes': application.admin_notes || 'No notes',
+        'Resume Link': application.students?.student_profiles?.resume_url || 'Not uploaded',
+        'Offer Letter Link': application.offer_letter_url || (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
+        ...additionalRequirementTypes.reduce((acc, type) => {
+          const reqLabel = type.replace('_', ' ').split(' ').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' ');
+          const reqKey = `${reqLabel} Link`;
+          const submission = application.student_requirement_submissions?.find(sub =>
+            sub.placement_requirements.type === type
+          );
+          acc[reqKey] = submission?.file_url || 'Not submitted';
+          return acc;
+        }, {} as Record<string, string>),
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(exportData);
+
+      const colWidths = [
+        { wch: 6 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 25 },
+        { wch: 8 }, { wch: 15 }, { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 18 },
+        ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
+      ];
+      ws['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(wb, ws, 'Applications');
+
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
+
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+
+      const success = await saveAndShareBase64(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+      if (success) {
+        Alert.alert('Success', 'Excel file ready for download!');
+      } else {
+        Alert.alert('Export Failed', 'Could not export applications to Excel.');
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Alert.alert('Export Failed', 'Could not export applications to Excel');
+    } finally {
+      if (selectedEvent) setDownloading(null);
+    }
+  };
+
+  // Prepare and download offer letters links as a text file
+  const downloadPlacementDocuments = async (event: PlacementEvent) => {
+    try {
+      setDownloading(`offers_${event.id}`);
+
+      // ensure applications for this event are loaded
+      const apps = (applications.length && applications[0]?.placement_event_id === event.id) ? applications : await loadEventApplications(event.id);
+
+      const acceptedWithOfferLetters = (apps || []).filter(app =>
         app.application_status === 'accepted' && app.offer_letter_url
       );
 
       if (acceptedWithOfferLetters.length === 0) {
-        Alert.alert('No Documents', 'No offer letters found for accepted students.');
+        // If none with actual offer_letter_url, prepare list of accepted students indicating missing files
+        const accepted = (apps || []).filter(app => app.application_status === 'accepted');
+        if (accepted.length === 0) {
+          Alert.alert('No Documents', 'No offer letters found for accepted students.');
+          return;
+        }
+        const offerLettersList = accepted.map((app, index) =>
+          `${index + 1}. ${app.students?.student_profiles?.full_name || app.students?.name}\n` +
+          `   UID: ${app.students?.uid}\n` +
+          `   Offer Letter: ${app.offer_letter_url || 'Not uploaded'}\n`
+        ).join('\n');
+
+        const content = `${event.company_name} - ${event.title}\n` +
+                        `Offer Letter Links for Accepted Students (some may be missing)\n` +
+                        `Generated: ${new Date().toLocaleDateString()}\n` +
+                        `Total Accepted: ${accepted.length}\n\n` +
+                        offerLettersList;
+
+        const filename = `${event.company_name}_offer_letters_${new Date().toISOString().split('T')[0]}.txt`;
+        const success = await saveAndShareText(content, filename);
+        if (success) {
+          Alert.alert('Links Ready', 'Offer letter links have been prepared for download.');
+        }
         return;
       }
 
-      // Create a text file with all offer letter links for mobile sharing
-      const offerLettersList = acceptedWithOfferLetters.map((app, index) => 
+      // If we have actual URLs, create a text file listing them (zipping files client-side is complicated)
+      const offerLettersList = acceptedWithOfferLetters.map((app, index) =>
         `${index + 1}. ${app.students?.student_profiles?.full_name || app.students?.name}\n` +
         `   UID: ${app.students?.uid}\n` +
         `   Offer Letter: ${app.offer_letter_url}\n`
       ).join('\n');
-      
+
       const content = `${event.company_name} - ${event.title}\n` +
-                     `Offer Letters for Accepted Students\n` +
-                     `Generated: ${new Date().toLocaleDateString()}\n` +
-                     `Total Offer Letters: ${acceptedWithOfferLetters.length}\n\n` +
-                     offerLettersList;
-      
+                      `Offer Letters for Accepted Students\n` +
+                      `Generated: ${new Date().toLocaleDateString()}\n` +
+                      `Total Offer Letters: ${acceptedWithOfferLetters.length}\n\n` +
+                      offerLettersList;
+
       const filename = `${event.company_name}_offer_letters_${new Date().toISOString().split('T')[0]}.txt`;
-      
-      const success = await downloadFile(content, filename, 'text/plain');
-      
+
+      const success = await saveAndShareText(content, filename);
+
       if (success) {
-        Alert.alert('Success', `Offer letter links shared! You can now access all ${acceptedWithOfferLetters.length} documents.`);
+        Alert.alert('Success', `Offer letter links prepared for ${acceptedWithOfferLetters.length} students.`);
       } else {
-        Alert.alert('Links Ready', 'Offer letter links have been prepared for download.');
+        Alert.alert('Error', 'Failed to prepare offer letters list.');
       }
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', 'Failed to download offer letters.');
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -212,9 +371,9 @@ export default function AdminPlacementsScreen() {
     try {
       setCreating(true);
 
-      // Create storage bucket for the company
+      // Create storage bucket for the company (best-effort)
       const bucketName = `${newEvent.company_name.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`;
-      
+
       const { error: bucketError } = await supabase.storage.createBucket(bucketName, {
         public: true,
         allowedMimeTypes: ['application/pdf', 'video/*', 'image/*'],
@@ -223,7 +382,6 @@ export default function AdminPlacementsScreen() {
 
       if (bucketError) {
         console.warn('Bucket creation warning:', bucketError);
-        // Continue even if bucket creation fails
       }
 
       const { data: eventData, error } = await supabase
@@ -245,7 +403,6 @@ export default function AdminPlacementsScreen() {
 
       if (error) throw error;
 
-      // Create placement requirements for each additional requirement
       if (newEvent.additional_requirements.length > 0 && eventData) {
         const requirementInserts = newEvent.additional_requirements.map(req => ({
           event_id: eventData.id,
@@ -266,7 +423,7 @@ export default function AdminPlacementsScreen() {
       Alert.alert('Success', 'Placement event created successfully!');
       setShowCreateModal(false);
       resetForm();
-      
+
       // Create notification for students
       await supabase
         .from('notifications')
@@ -279,16 +436,16 @@ export default function AdminPlacementsScreen() {
           created_by: user?.id,
           is_active: true,
         });
-      
+
       loadPlacementEvents();
     } catch (error) {
+      console.error('Create placement event error:', error);
       Alert.alert('Error', 'Failed to create placement event');
     } finally {
       setCreating(false);
     }
   };
 
-  
   const resetForm = () => {
     setNewEvent({
       title: '',
@@ -306,6 +463,7 @@ export default function AdminPlacementsScreen() {
     setShowApplicationsModal(true);
   };
 
+  // Accept application: update DB and refresh list
   const acceptApplication = async (applicationId: string) => {
     try {
       const { error } = await supabase
@@ -318,131 +476,23 @@ export default function AdminPlacementsScreen() {
       Alert.alert('Success', 'Application marked as accepted');
       if (selectedEvent?.id) {
         await loadEventApplications(selectedEvent.id);
-        
-        // Create notification for the student
-        const application = applications.find(app => app.id === applicationId);
-        if (application) {
-          await supabase
-            .from('notifications')
-            .insert({
-              title: `Application ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-              message: `Your application for ${selectedEvent.title} at ${selectedEvent.company_name} has been ${status}.`,
-              type: 'placement',
-              target_audience: 'all', // Will be filtered by student
-              created_by: user?.id,
-              is_active: true,
-            });
-        }
+
+        // send a notification (best-effort)
+        await supabase
+          .from('notifications')
+          .insert({
+            title: 'Application Accepted',
+            message: `Your application for ${selectedEvent.title} at ${selectedEvent.company_name} has been accepted.`,
+            type: 'placement',
+            target_audience: 'all', // will be filtered by server or client when delivering
+            created_by: user?.id,
+            is_active: true,
+          });
       }
     } catch (err) {
       console.error('Accept application error:', err);
       Alert.alert('Error', 'Failed to update application status');
     }
-  };
-
-  const exportApplicationsToExcel = async () => {
-    if (!selectedEvent || applications.length === 0) {
-      Alert.alert('No Data', 'No applications to export');
-      return;
-    }
-
-    try {
-      // Get all additional requirement types from the selected event
-      const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
-
-      const exportData = applications.map((application, index) => ({
-        'S.No': index + 1,
-        'Full Name': application.students?.student_profiles?.full_name || application.students?.name || 'N/A',
-        'UID': application.students?.uid || 'N/A',
-        'Roll Number': application.students?.roll_no || 'N/A',
-        'Email': application.students?.email || 'N/A',
-        'Class': application.students?.student_profiles?.class || 'N/A',
-        'Application Status': application.application_status.toUpperCase(),
-        'Applied Date': formatDate(application.applied_at),
-        'Admin Notes': application.admin_notes || 'No notes',
-        'Resume Link': application.students?.student_profiles?.resume_url || 'Not uploaded',
-        'Offer Letter Link': application.offer_letter_url || (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
-        // Add additional requirement submission links
-        ...additionalRequirementTypes.reduce((acc, type) => {
-          const reqLabel = type.replace('_', ' ').split(' ').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1)
-          ).join(' ');
-          const reqKey = `${reqLabel} Link`;
-          
-          // Find the submission for this additional requirement type
-          const submission = application.student_requirement_submissions?.find(sub => 
-            sub.placement_requirements.type === type
-          );
-          
-          acc[reqKey] = submission?.file_url || 'Not submitted';
-          return acc;
-        }, {} as Record<string, string>),
-      }));
-
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(exportData);
-
-      const colWidths = [
-        { wch: 6 },   // S.No
-        { wch: 20 },  // Full Name
-        { wch: 12 },  // UID
-        { wch: 15 },  // Roll Number
-        { wch: 25 },  // Email
-        { wch: 8 },   // Class
-        { wch: 15 },  // Application Status
-        { wch: 12 },  // Applied Date
-        { wch: 15 },  // Admin Notes
-        { wch: 15 },  // Resume Link
-        { wch: 18 },  // Offer Letter Link
-        // Add column widths for additional requirement links
-        ...Array(additionalRequirementTypes.length).fill({ wch: 18 }),
-      ];
-      ws['!cols'] = colWidths;
-
-      XLSX.utils.book_append_sheet(wb, ws, 'Applications');
-
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
-
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-      
-      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      
-      if (success) {
-        Alert.alert('Success', 'Excel file ready for download!');
-      } else {
-        Alert.alert('Report Ready', 'Excel report has been prepared for download.');
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      Alert.alert('Export Failed', 'Could not export applications to Excel');
-    }
-  };
-
-  const addAdditionalRequirement = (type: string) => {
-    if (newEvent.additional_requirements.some(req => req.type === type)) {
-      return; // Already added
-    }
-    setNewEvent(prev => ({
-      ...prev,
-      additional_requirements: [...prev.additional_requirements, { type, required: false }]
-    }));
-  };
-
-  const removeAdditionalRequirement = (type: string) => {
-    setNewEvent(prev => ({
-      ...prev,
-      additional_requirements: prev.additional_requirements.filter(req => req.type !== type)
-    }));
-  };
-
-  const toggleRequirementRequired = (type: string) => {
-    setNewEvent(prev => ({
-      ...prev,
-      additional_requirements: prev.additional_requirements.map(req =>
-        req.type === type ? { ...req, required: !req.required } : req
-      )
-    }));
   };
 
   const requirementTypes = [
@@ -453,6 +503,7 @@ export default function AdminPlacementsScreen() {
     { type: 'project_demo', label: 'Project Demo' },
     { type: 'coding_sample', label: 'Coding Sample' },
   ];
+
   return (
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
@@ -506,11 +557,10 @@ export default function AdminPlacementsScreen() {
               <View style={styles.downloadActions}>
                 <TouchableOpacity
                   style={[styles.downloadActionButton, downloading === `excel_${event.id}` && styles.disabledButton]}
-                  onPress={() => {
+                  onPress={async () => {
                     setSelectedEvent(event);
-                    loadEventApplications(event.id).then(() => {
-                      exportApplicationsToExcel();
-                    });
+                    await loadEventApplications(event.id);
+                    exportApplicationsToExcel();
                   }}
                   disabled={downloading === `excel_${event.id}`}
                 >
@@ -522,17 +572,16 @@ export default function AdminPlacementsScreen() {
                 
                 <TouchableOpacity
                   style={[styles.downloadActionButton, downloading === `offers_${event.id}` && styles.disabledButton]}
-                  onPress={() => {
+                  onPress={async () => {
                     setSelectedEvent(event);
-                    loadEventApplications(event.id).then(() => {
-                      downloadPlacementDocuments(event);
-                    });
+                    await loadEventApplications(event.id);
+                    downloadPlacementDocuments(event);
                   }}
                   disabled={downloading === `offers_${event.id}`}
                 >
                   <FileText size={14} color="#AF52DE" />
                   <Text style={styles.downloadActionText}>
-                    {downloading === `offers_${event.id}` ? 'Downloading...' : 'Offer Letters'}
+                    {downloading === `offers_${event.id}` ? 'Preparing...' : 'Offer Letters'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -638,9 +687,9 @@ export default function AdminPlacementsScreen() {
                     ]}
                     onPress={() => {
                       if (newEvent.additional_requirements.some(req => req.type === reqType.type)) {
-                        removeAdditionalRequirement(reqType.type);
+                        setNewEvent(prev => ({ ...prev, additional_requirements: prev.additional_requirements.filter(r => r.type !== reqType.type) }));
                       } else {
-                        addAdditionalRequirement(reqType.type);
+                        setNewEvent(prev => ({ ...prev, additional_requirements: [...prev.additional_requirements, { type: reqType.type, required: false }] }));
                       }
                     }}
                   >
@@ -664,7 +713,10 @@ export default function AdminPlacementsScreen() {
                       </Text>
                       <TouchableOpacity
                         style={[styles.requiredToggle, req.required && styles.requiredToggleActive]}
-                        onPress={() => toggleRequirementRequired(req.type)}
+                        onPress={() => setNewEvent(prev => ({
+                          ...prev,
+                          additional_requirements: prev.additional_requirements.map(r => r.type === req.type ? { ...r, required: !r.required } : r)
+                        }))}
                       >
                         <Text style={[styles.requiredToggleText, req.required && styles.requiredToggleTextActive]}>
                           {req.required ? 'Required' : 'Optional'}
@@ -672,7 +724,7 @@ export default function AdminPlacementsScreen() {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.removeRequirement}
-                        onPress={() => removeAdditionalRequirement(req.type)}
+                        onPress={() => setNewEvent(prev => ({ ...prev, additional_requirements: prev.additional_requirements.filter(r => r.type !== req.type) }))}
                       >
                         <X size={16} color="#FF3B30" />
                       </TouchableOpacity>
@@ -721,7 +773,9 @@ export default function AdminPlacementsScreen() {
                 
                 <TouchableOpacity
                   style={styles.bulkDownloadButton}
-                  onPress={() => downloadPlacementDocuments(selectedEvent!)}
+                  onPress={() => {
+                    if (selectedEvent) downloadPlacementDocuments(selectedEvent);
+                  }}
                 >
                   <Download size={16} color="#FFFFFF" />
                   <Text style={styles.bulkDownloadButtonText}>Download Offer Letters</Text>
@@ -759,13 +813,9 @@ export default function AdminPlacementsScreen() {
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
                           try {
-                            // Use WebBrowser for better PDF viewing on mobile
                             WebBrowser.openBrowserAsync(application.offer_letter_url!, {
                               presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                              showTitle: true,
-                              toolbarColor: '#667eea',
-                              controlsColor: '#FFFFFF',
-                              showInRecents: true
+                              showTitle: true
                             });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
@@ -786,19 +836,13 @@ export default function AdminPlacementsScreen() {
                         <Text style={styles.acceptButtonText}>Mark as Accepted</Text>
                       </TouchableOpacity>
                     )}
-                    {app.offer_letter_url && (
+
+                    {application.offer_letter_url && (
                       <TouchableOpacity
                         style={styles.offerLetterLink}
                         onPress={() => {
                           try {
-                            // Use WebBrowser for better PDF viewing on mobile
-                            WebBrowser.openBrowserAsync(app.offer_letter_url!, {
-                              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                              showTitle: true,
-                              toolbarColor: '#667eea',
-                              controlsColor: '#FFFFFF',
-                              showInRecents: true
-                            });
+                            WebBrowser.openBrowserAsync(application.offer_letter_url!);
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
                             Alert.alert('Error', 'Failed to open offer letter.');
