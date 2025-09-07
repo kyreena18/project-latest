@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
@@ -295,7 +296,11 @@ export default function ClassView() {
               let downloadCount = 0;
               for (const fileData of fileUrls) {
                 try {
-                  await Linking.openURL(fileData.url);
+                  await WebBrowser.openBrowserAsync(fileData.url, {
+                    presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+                    showTitle: true,
+                    toolbarColor: '#667eea',
+                  });
                   downloadCount++;
                   // Small delay between downloads
                   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -388,7 +393,11 @@ export default function ClassView() {
     }
     try {
       // Mobile-first implementation
-      await Linking.openURL(submission.file_url);
+      await WebBrowser.openBrowserAsync(submission.file_url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        showTitle: true,
+        toolbarColor: '#667eea',
+      });
     } catch (error) {
       Alert.alert('Error', `Failed to open ${title}.`);
     }
