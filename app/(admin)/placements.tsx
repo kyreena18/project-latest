@@ -8,7 +8,6 @@ import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser'
 import { formatDate, getStatusColor, downloadFileWithFallback } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import { Linking } from 'react-native';
-import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { downloadFile } from '@/lib/utils';
