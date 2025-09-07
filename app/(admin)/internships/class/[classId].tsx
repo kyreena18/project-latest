@@ -10,14 +10,7 @@ import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Only import web-specific libraries on web platform
-let JSZip: any = null;
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  JSZip = require('jszip');
-  FileSaver = require('file-saver');
-}
+import * as WebBrowser from 'expo-web-browser';
 
 interface StudentProfile {
   id: string;
@@ -237,20 +230,25 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
       
-      // Mobile-first implementation
+      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + filename;
       
-      FileSystem.writeAsStringAsync(uri, wbout, {
+      await FileSystem.writeAsStringAsync(uri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
-      }).then(() => {
-        Sharing.shareAsync(uri);
-      }).catch((error) => {
-        console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to save file');
       });
       
-      Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Internship Report',
+          UTI: 'com.microsoft.excel.xlsx'
+        });
+        Alert.alert('Success', `Excel report for ${classId} ready for download!`);
+      } else {
+        console.error('File save error:', error);
+        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+      }
     } catch (error) {
       console.error('Excel generation error:', error);
       Alert.alert('Error', 'Failed to generate Excel report');
@@ -283,104 +281,30 @@ export default function ClassView() {
         return;
       }
 
-      // Mobile-first implementation - open each document individually
-      Alert.alert(
-        'Download Documents',
-        `Found ${fileUrls.length} ${assignment.title} documents. They will be opened individually for download.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Download All', 
-            onPress: async () => {
-              let downloadCount = 0;
-              for (const fileData of fileUrls) {
-                try {
-                  await Linking.openURL(fileData.url);
-                  downloadCount++;
-                  // Small delay between downloads
-                  await new Promise(resolve => setTimeout(resolve, 1500));
-                } catch (error) {
-                  console.error(`Failed to open file for ${fileData.studentName}:`, error);
-                }
-              }
-              Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Bulk download error:', error);
-      Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
-    } finally {
-      setDownloading(null);
-    }
-  };
-
-  const downloadAllDocumentsMobile = async (assignmentType: string) => {
-    try {
-      setDownloading(assignmentType);
+      // Create a simple text file with all document links for mobile sharing
+      const documentsList = fileUrls.map((file, index) => 
+        `${index + 1}. ${file.studentName} (${file.rollNo})\n   ${file.url}\n`
+      ).join('\n');
       
-      const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
-      if (!assignment) return;
-
-      // Collect all file URLs for this assignment type
-      const fileUrls: { url: string; studentName: string; rollNo: string }[] = [];
+      const content = `${assignment.title} Documents\n` +
+                     `Class: ${classId}\n` +
+                     `Generated: ${new Date().toLocaleDateString()}\n` +
+                     `Total Documents: ${fileUrls.length}\n\n` +
+                     documentsList;
       
-      profiles.forEach(profile => {
-        const submission = getStudentSubmission(profile.student_id, assignmentType);
-        if (submission?.file_url) {
-          fileUrls.push({
-            url: submission.file_url,
-            studentName: profile.full_name,
-            rollNo: profile.roll_no
-          });
-        }
-      });
-
-      if (fileUrls.length === 0) {
-        Alert.alert('No Documents', `No ${assignment.title} documents found to download.`);
-        return;
-      }
-
-      // For mobile, open each document individually
-      let downloadCount = 0;
-      for (const fileData of fileUrls) {
-        try {
-          if (Platform.OS === 'web') {
-            window.open(fileData.url, '_blank');
-          } else {
-            await WebBrowser.openBrowserAsync(fileData.url, {
-              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-              showTitle: true,
-              toolbarColor: '#667eea',
-            });
-          }
-          if (Platform.OS === 'web') {
-            window.open(fileData.url, '_blank');
-          } else {
-            await WebBrowser.openBrowserAsync(fileData.url, {
-              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-              showTitle: true,
-              toolbarColor: '#667eea',
-            });
-          }
-          downloadCount++;
-          // Small delay between opening files
-          if (downloadCount < fileUrls.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        } catch (error) {
-          console.error(`Failed to open file for ${fileData.studentName}:`, error);
-        }
-      }
-
+      const filename = `${classId}_${assignment.type}_links_${new Date().toISOString().split('T')[0]}.txt`;
+      const uri = FileSystem.documentDirectory + filename;
       
-      if (downloadCount > 0) {
-        Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents successfully`);
+      await FileSystem.writeAsStringAsync(uri, content);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'text/plain',
+          dialogTitle: `Share ${assignment.title} Document Links`
+        });
+        Alert.alert('Success', `Document links shared! You can now access all ${fileUrls.length} documents.`);
       } else {
-        Alert.alert('Error', `Failed to open any ${assignment.title} documents`);
+        Alert.alert('Links Ready', `Document links saved to: ${uri}`);
       }
     } catch (error) {
       console.error('Bulk download error:', error);
@@ -402,9 +326,16 @@ export default function ClassView() {
       return;
     }
     try {
-      // Mobile-first implementation
-      await Linking.openURL(submission.file_url);
+      // Use WebBrowser for better PDF viewing on mobile
+      await WebBrowser.openBrowserAsync(submission.file_url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        showTitle: true,
+        toolbarColor: '#667eea',
+        controlsColor: '#FFFFFF',
+        showInRecents: true
+      });
     } catch (error) {
+      console.error('Error opening document:', error);
       Alert.alert('Error', `Failed to open ${title}.`);
     }
   };

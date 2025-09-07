@@ -10,14 +10,7 @@ import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Only import web-specific libraries on web platform
-let JSZip: any = null;
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  JSZip = require('jszip');
-  FileSaver = require('file-saver');
-}
+import * as WebBrowser from 'expo-web-browser';
 
 interface PlacementEvent {
   id: string;
@@ -182,73 +175,33 @@ export default function AdminPlacementsScreen() {
         return;
       }
 
-      // Mobile-first implementation - open individual files
-      Alert.alert(
-        'Download Offer Letters',
-        `Found ${acceptedWithOfferLetters.length} offer letters. They will be opened individually for download.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Download All', 
-            onPress: async () => {
-              let downloadCount = 0;
-              for (const application of acceptedWithOfferLetters) {
-                try {
-                  await openBrowserAsync(application.offer_letter_url!, {
-                    presentationStyle: WebBrowserPresentationStyle.FULL_SCREEN,
-                    showTitle: true,
-                    toolbarColor: '#667eea',
-                  });
-                  downloadCount++;
-                  // Small delay between downloads
-                  await new Promise(resolve => setTimeout(resolve, 1500));
-                } catch (error) {
-                  console.error(`Failed to open offer letter for ${application.students.name}:`, error);
-                }
-              }
-              Alert.alert('Success', `Opened ${downloadCount} offer letters for download`);
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Bulk download error:', error);
-      Alert.alert('Error', 'Failed to download offer letters.');
-    }
-  };
-
-  const downloadPlacementDocumentsMobile = async (event: PlacementEvent) => {
-    try {
-      // Load applications for this event if not already loaded
-      if (!applications.length || applications[0]?.placement_event_id !== event.id) {
-        await loadEventApplications(event.id);
+      // Create a text file with all offer letter links for mobile sharing
+      const offerLettersList = acceptedWithOfferLetters.map((app, index) => 
+        `${index + 1}. ${app.students?.student_profiles?.full_name || app.students?.name}\n` +
+        `   UID: ${app.students?.uid}\n` +
+        `   Offer Letter: ${app.offer_letter_url}\n`
+      ).join('\n');
+      
+      const content = `${event.company_name} - ${event.title}\n` +
+                     `Offer Letters for Accepted Students\n` +
+                     `Generated: ${new Date().toLocaleDateString()}\n` +
+                     `Total Offer Letters: ${acceptedWithOfferLetters.length}\n\n` +
+                     offerLettersList;
+      
+      const filename = `${event.company_name}_offer_letters_${new Date().toISOString().split('T')[0]}.txt`;
+      const uri = FileSystem.documentDirectory + filename;
+      
+      await FileSystem.writeAsStringAsync(uri, content);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'text/plain',
+          dialogTitle: 'Share Offer Letter Links'
+        });
+        Alert.alert('Success', `Offer letter links shared! You can now access all ${acceptedWithOfferLetters.length} documents.`);
+      } else {
+        Alert.alert('Links Ready', `Offer letter links saved to: ${uri}`);
       }
-
-      // Filter accepted applications with offer letters
-      const acceptedWithOfferLetters = applications.filter(app => 
-        app.application_status === 'accepted' && app.offer_letter_url
-      );
-
-      if (acceptedWithOfferLetters.length === 0) {
-        Alert.alert('No Documents', 'No offer letters found for accepted students.');
-        return;
-      }
-
-      // For mobile, open each document individually
-      let downloadCount = 0;
-
-      for (const application of acceptedWithOfferLetters) {
-        try {
-          await Linking.openURL(application.offer_letter_url!);
-          downloadCount++;
-          // Small delay between opening files
-          await new Promise(resolve => setTimeout(resolve, 1500));
-        } catch (error) {
-          console.error(`Failed to download offer letter for ${application.students.name}:`, error);
-        }
-      }
-
-      Alert.alert('Success', `Opened ${downloadCount} offer letters for download`);
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', 'Failed to download offer letters.');
@@ -456,20 +409,25 @@ export default function AdminPlacementsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
 
-      // Mobile-first implementation
+      // Mobile-compatible Excel generation
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + filename;
       
-      FileSystem.writeAsStringAsync(uri, wbout, {
+      await FileSystem.writeAsStringAsync(uri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
-      }).then(() => {
-        Sharing.shareAsync(uri);
-      }).catch((error) => {
-        console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to save file');
       });
-
-      Alert.alert('Success', `Excel file downloaded successfully!`);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Applications Report',
+          UTI: 'com.microsoft.excel.xlsx'
+        });
+        Alert.alert('Success', 'Excel file ready for download!');
+      } else {
+        console.error('File save error:', error);
+        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+      }
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Export Failed', 'Could not export applications to Excel');
@@ -782,11 +740,13 @@ export default function AdminPlacementsScreen() {
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
                           try {
-                            // Mobile-compatible file viewing
-                            openBrowserAsync(application.offer_letter_url!, {
-                              presentationStyle: WebBrowserPresentationStyle.FULL_SCREEN,
+                            // Use WebBrowser for better PDF viewing on mobile
+                            WebBrowser.openBrowserAsync(application.offer_letter_url!, {
+                              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
                               showTitle: true,
                               toolbarColor: '#667eea',
+                              controlsColor: '#FFFFFF',
+                              showInRecents: true
                             });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);

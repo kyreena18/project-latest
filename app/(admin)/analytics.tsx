@@ -8,12 +8,7 @@ import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Only import FileSaver on web platform
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  FileSaver = require('file-saver');
-}
+import * as Linking from 'expo-linking';
 
 interface PlacementStats {
   totalCompanies: number;
@@ -309,20 +304,27 @@ export default function AnalyticsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `Placement_Analytics_Report_${timestamp}.xlsx`;
       
-      // Mobile-first implementation
+      // Mobile-compatible implementation
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + filename;
       
       FileSystem.writeAsStringAsync(uri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
-      }).then(() => {
-        Sharing.shareAsync(uri);
+      }).then(async () => {
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            dialogTitle: 'Save Analytics Report',
+            UTI: 'com.microsoft.excel.xlsx'
+          });
+          Alert.alert('Success', 'Analytics report ready for download!');
+        } else {
+          Alert.alert('Download Ready', `Report saved to: ${uri}`);
+        }
       }).catch((error) => {
         console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to save file');
+        Alert.alert('Error', 'Failed to generate report');
       });
-      
-      Alert.alert('Success', 'Analytics report downloaded successfully as Excel file!');
     } catch (error) {
       console.error('Excel generation error:', error);
       Alert.alert('Error', 'Failed to generate Excel report');

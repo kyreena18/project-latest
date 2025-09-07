@@ -134,7 +134,7 @@ export default function ClassStudentsView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Students_${timestamp}.xlsx`;
       
-      // Mobile-first implementation
+      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + filename;
       
@@ -142,8 +142,16 @@ export default function ClassStudentsView() {
         encoding: FileSystem.EncodingType.Base64,
       });
       
-      await Sharing.shareAsync(uri);
-      Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Student List',
+          UTI: 'com.microsoft.excel.xlsx'
+        });
+        Alert.alert('Success', `Excel report for ${classId} ready for download!`);
+      } else {
+        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+      }
     } catch (error) {
       console.error('Excel generation error:', error);
       Alert.alert('Error', 'Failed to generate Excel report');

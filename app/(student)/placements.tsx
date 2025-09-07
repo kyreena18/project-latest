@@ -9,14 +9,7 @@ import * as XLSX from 'xlsx';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Only import web-specific libraries on web platform
-let JSZip: any = null;
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  JSZip = require('jszip');
-  FileSaver = require('file-saver');
-}
+import * as WebBrowser from 'expo-web-browser';
 
 interface PlacementEvent {
   id: string;
@@ -438,20 +431,25 @@ export default function AdminPlacementsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
 
-      // Mobile-first implementation
+      // Mobile-compatible Excel generation
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + filename;
       
-      FileSystem.writeAsStringAsync(uri, wbout, {
+      await FileSystem.writeAsStringAsync(uri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
-      }).then(() => {
-        Sharing.shareAsync(uri);
-      }).catch((error) => {
-        console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to save file');
       });
-
-      Alert.alert('Success', `Excel file downloaded successfully!`);
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Applications Report',
+          UTI: 'com.microsoft.excel.xlsx'
+        });
+        Alert.alert('Success', 'Excel file ready for download!');
+      } else {
+        console.error('File save error:', error);
+        Alert.alert('Report Ready', `Report saved to: ${uri}`);
+      }
     } catch (error) {
       console.error('Export error:', error);
       Alert.alert('Export Failed', 'Could not export applications to Excel');
@@ -764,16 +762,14 @@ export default function AdminPlacementsScreen() {
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
                           try {
-                            // Mobile-compatible file viewing
-                            if (Platform.OS === 'web') {
-                              window.open(application.offer_letter_url!, '_blank');
-                            } else {
-                              WebBrowser.openBrowserAsync(application.offer_letter_url!, {
-                                presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                                showTitle: true,
-                                toolbarColor: '#667eea',
-                              });
-                            }
+                            // Use WebBrowser for better PDF viewing on mobile
+                            WebBrowser.openBrowserAsync(application.offer_letter_url!, {
+                              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+                              showTitle: true,
+                              toolbarColor: '#667eea',
+                              controlsColor: '#FFFFFF',
+                              showInRecents: true
+                            });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
                             Alert.alert('Error', 'Failed to open offer letter.');

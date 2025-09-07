@@ -10,12 +10,6 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
-// Only import FileSaver on web platform
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  FileSaver = require('file-saver');
-}
-
 interface StudentData {
   name: string;
   uid: string;
@@ -53,20 +47,25 @@ export default function BulkImportScreen() {
         { wch: 12 }, // year
       ];
 
-      // Mobile-first implementation
+      // Mobile-compatible Excel generation
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       const uri = FileSystem.documentDirectory + 'student_import_template.xlsx';
       
-      FileSystem.writeAsStringAsync(uri, wbout, {
+      await FileSystem.writeAsStringAsync(uri, wbout, {
         encoding: FileSystem.EncodingType.Base64,
-      }).then(() => {
-        Sharing.shareAsync(uri);
-      }).catch((error) => {
-        console.error('File save error:', error);
-        Alert.alert('Error', 'Failed to save template');
       });
-
-      Alert.alert('Template Downloaded', 'Fill in the template with student data and upload it back.');
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Student Import Template',
+          UTI: 'com.microsoft.excel.xlsx'
+        });
+        Alert.alert('Template Ready', 'Fill in the template with student data and upload it back.');
+      } else {
+        console.error('File save error:', error);
+        Alert.alert('Template Ready', `Template saved to: ${uri}`);
+      }
     } catch (error) {
       console.error('Template generation error:', error);
       Alert.alert('Error', 'Failed to generate template');
