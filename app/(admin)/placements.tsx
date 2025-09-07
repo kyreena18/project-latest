@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Building, Calendar, Users, X, CreditCard as Edit, Trash2, Eye, FileText, Download, ExternalLink } from 'lucide-react-native';
+import { Plus, Building, Calendar, Users, X, CreditCard as Edit, Trash2, Eye, FileText, Download, ExternalLink, Briefcase, User } from 'lucide-react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
 import { formatDate, getStatusColor, downloadFileWithFallback } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { Linking } from 'react-native';
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { downloadFile } from '@/lib/utils';
