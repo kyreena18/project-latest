@@ -33,6 +33,7 @@ interface PlacementApplication {
   application_status: 'pending' | 'applied' | 'accepted' | 'rejected';
   applied_at: string;
   admin_notes?: string;
+  offer_letter_url?: string;
   student_requirement_submissions?: {
     id: string;
     requirement_id: string;
@@ -150,6 +151,15 @@ export default function AdminPlacementsScreen() {
               class: 'TYIT',
               resume_url: 'https://example.com/resume1.pdf'
             }
+          }
+        }
+      ];
+      setApplications(mockApplications);
+    }
+  };
+
+  const openURL = async (url: string) => {
+    try {
       if (Platform.OS === 'web') {
         window.open(url, '_blank');
       } else {
@@ -159,9 +169,8 @@ export default function AdminPlacementsScreen() {
           toolbarColor: '#667eea',
         });
       }
-        }
-      ];
-      setApplications(mockApplications);
+    } catch (error) {
+      console.error('Error opening URL:', error);
     }
   };
 
@@ -182,10 +191,14 @@ export default function AdminPlacementsScreen() {
         return;
       }
 
-            }
-          }
-        ]
-      );
+      // For web, create a zip file with all offer letters
+      if (Platform.OS === 'web') {
+        // Web implementation would go here
+        Alert.alert('Success', `Found ${acceptedWithOfferLetters.length} offer letters to download`);
+      } else {
+        // For mobile, open each document individually
+        await downloadPlacementDocumentsMobile(event);
+      }
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', 'Failed to download offer letters.');
@@ -214,7 +227,7 @@ export default function AdminPlacementsScreen() {
 
       for (const application of acceptedWithOfferLetters) {
         try {
-          await Linking.openURL(application.offer_letter_url!);
+          await openURL(application.offer_letter_url!);
           downloadCount++;
           // Small delay between opening files
           await new Promise(resolve => setTimeout(resolve, 1500));
@@ -352,8 +365,8 @@ export default function AdminPlacementsScreen() {
           await supabase
             .from('notifications')
             .insert({
-              title: `Application ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-              message: `Your application for ${selectedEvent.title} at ${selectedEvent.company_name} has been ${status}.`,
+              title: `Application Accepted`,
+              message: `Your application for ${selectedEvent.title} at ${selectedEvent.company_name} has been accepted.`,
               type: 'placement',
               target_audience: 'all', // Will be filtered by student
               created_by: user?.id,
@@ -367,7 +380,7 @@ export default function AdminPlacementsScreen() {
     }
   };
 
-  const exportApplicationsToExcel = () => {
+  const exportApplicationsToExcel = async () => {
     if (!selectedEvent || applications.length === 0) {
       Alert.alert('No Data', 'No applications to export');
       return;
@@ -447,7 +460,6 @@ export default function AdminPlacementsScreen() {
         });
         Alert.alert('Success', 'Excel file ready for download!');
       } else {
-        console.error('File save error:', error);
         Alert.alert('Report Ready', `Report saved to: ${uri}`);
       }
     } catch (error) {
