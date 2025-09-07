@@ -135,13 +135,6 @@ export default function AdminStudentsScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Student Management</Text>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.bulkImportButton}
-            onPress={() => router.push('/(admin)/students/bulk-import')}
-          >
-            <Plus size={Math.max(screenWidth * 0.04, 14)} color="#FFFFFF" />
-            <Text style={styles.bulkImportText}>Import</Text>
-          </TouchableOpacity>
           <View style={styles.headerStats}>
             <Text style={styles.headerStatsText}>{totalStudents} Total</Text>
           </View>
@@ -225,21 +218,6 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: screenWidth * 0.03,
-  },
-  bulkImportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#34C759',
-    borderRadius: screenWidth * 0.02,
-    paddingHorizontal: screenWidth * 0.03,
-    paddingVertical: screenHeight * 0.008,
-    gap: screenWidth * 0.015,
-  },
-  bulkImportText: {
-    fontSize: Math.max(screenWidth * 0.03, 11),
-    color: '#FFFFFF',
-    fontWeight: '600',
   },
   headerStats: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',

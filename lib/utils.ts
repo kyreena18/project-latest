@@ -1,3 +1,7 @@
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
 export const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -30,8 +34,6 @@ export const getStatusColor = (status: string) => {
 
 // Helper function for cross-platform file downloads
 export const downloadFile = async (content: string, filename: string, mimeType: string = 'text/plain') => {
-  const { Platform } = require('react-native');
-  
   if (Platform.OS === 'web') {
     // Web implementation using Blob and URL.createObjectURL
     const blob = new Blob([content], { type: mimeType });
@@ -46,30 +48,78 @@ export const downloadFile = async (content: string, filename: string, mimeType: 
     return true;
   } else {
     // Mobile implementation using expo-file-system and expo-sharing
-    const FileSystem = require('expo-file-system');
-    const Sharing = require('expo-sharing');
-    
-    const uri = FileSystem.documentDirectory + filename;
-    
-    if (mimeType.includes('xlsx')) {
-      await FileSystem.writeAsStringAsync(uri, content, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-    } else {
-      await FileSystem.writeAsStringAsync(uri, content);
-    }
-    
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType,
-        dialogTitle: `Save ${filename}`,
-        UTI: mimeType.includes('xlsx') ? 'com.microsoft.excel.xlsx' : undefined
-      });
-      return true;
-    } else {
-      console.log(`File saved to: ${uri}`);
+    try {
+      const uri = FileSystem.documentDirectory + filename;
+      
+      if (mimeType.includes('xlsx')) {
+        await FileSystem.writeAsStringAsync(uri, content, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      } else {
+        await FileSystem.writeAsStringAsync(uri, content);
+      }
+      
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType,
+          dialogTitle: `Save ${filename}`,
+          UTI: mimeType.includes('xlsx') ? 'com.microsoft.excel.xlsx' : undefined
+        });
+        return true;
+      } else {
+        console.log(`File saved to: ${uri}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Mobile file operation error:', error);
+      // Fallback to sharing the content as text
+      if (await Sharing.isAvailableAsync()) {
+        const tempUri = FileSystem.cacheDirectory + filename;
+        await FileSystem.writeAsStringAsync(tempUri, content);
+        await Sharing.shareAsync(tempUri);
+        return true;
+      }
       return false;
     }
+  }
+};
+
+// Enhanced download function with better error handling
+export const downloadFileWithFallback = async (content: string, filename: string, mimeType: string = 'text/plain') => {
+  if (Platform.OS === 'web') {
+    return downloadFile(content, filename, mimeType);
+  } else {
+    // Try cache directory first, then documents directory
+    const directories = [FileSystem.cacheDirectory, FileSystem.documentDirectory];
+    
+    for (const directory of directories) {
+      try {
+        const uri = directory + filename;
+        
+        if (mimeType.includes('xlsx')) {
+          await FileSystem.writeAsStringAsync(uri, content, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } else {
+          await FileSystem.writeAsStringAsync(uri, content);
+        }
+        
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType,
+            dialogTitle: `Save ${filename}`,
+            UTI: mimeType.includes('xlsx') ? 'com.microsoft.excel.xlsx' : undefined
+          });
+          return true;
+        }
+      } catch (error) {
+        console.log(`Failed to write to ${directory}, trying next...`);
+        continue;
+      }
+    }
+    
+    console.error('All file write attempts failed');
+    return false;
   }
 };
 

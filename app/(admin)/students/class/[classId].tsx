@@ -55,7 +55,11 @@ export default function ClassStudentsView() {
         }
 
         // Sort by roll number
-        mockStudents.sort((a, b) => a.roll_no.localeCompare(b.roll_no));
+        mockStudents.sort((a, b) => {
+          const rollA = parseInt(a.roll_no) || 0;
+          const rollB = parseInt(b.roll_no) || 0;
+          return rollA - rollB;
+        });
         setStudents(mockStudents);
         setLoading(false);
         return;
@@ -94,7 +98,11 @@ export default function ClassStudentsView() {
         }));
         
         // Sort by roll number
-        transformedData.sort((a, b) => a.roll_no.localeCompare(b.roll_no));
+        transformedData.sort((a, b) => {
+          const rollA = parseInt(a.roll_no) || 0;
+          const rollB = parseInt(b.roll_no) || 0;
+          return rollA - rollB;
+        });
         setStudents(transformedData);
       }
     } catch (error) {
