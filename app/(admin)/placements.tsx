@@ -760,13 +760,11 @@ export default function AdminPlacementsScreen() {
                               showTitle: true,
                               toolbarColor: '#667eea',
                               controlsColor: '#FFFFFF',
-                              showInRecents: true,
-                              enableBarCollapsing: true,
-                              dismissButtonStyle: WebBrowser.WebBrowserDismissButtonStyle.CLOSE
+                             showInRecents: true
                             });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
-                            Alert.alert('Error', 'Failed to open offer letter. Please check if the URL is valid.');
+                           Alert.alert('Error', 'Failed to open offer letter.');
                           }
                         }}
                       >

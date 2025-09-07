@@ -177,67 +177,6 @@ export default function ClassView() {
     }
   };
 
-  // Helper function to save and share base64 content (works on mobile and web)
-  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const link = document.createElement('a');
-        link.href = `data:${mime};base64,${base64Data}`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareBase64 error:', err);
-      return false;
-    }
-  };
-
-  // Helper function to save and share text content
-  const saveAndShareText = async (content: string, filename: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Share text file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareText error:', err);
-      return false;
-    }
-  };
-
   const exportToExcel = async () => {
     try {
       const data = profiles.map((profile, index) => {
@@ -292,7 +231,7 @@ export default function ClassView() {
       
       const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
       
-      const success = await saveAndShareBase64(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       
       if (success) {
         Alert.alert('Success', `Excel report for ${classId} ready for download!`);
@@ -345,7 +284,7 @@ export default function ClassView() {
       
       const filename = `${classId}_${assignment.type}_links_${new Date().toISOString().split('T')[0]}.txt`;
       
-      const success = await saveAndShareText(content, filename);
+      const success = await downloadFileWithFallback(content, filename, 'text/plain');
       
       if (success) {
         Alert.alert('Success', `Document links shared! You can now access all ${fileUrls.length} documents.`);
@@ -378,7 +317,8 @@ export default function ClassView() {
         showTitle: true,
         toolbarColor: '#667eea',
         controlsColor: '#FFFFFF',
-        showInRecents: true
+        showInRecents: true,
+        enableBarCollapsing: true
       });
     } catch (error) {
       console.error('Error opening document:', error);
