@@ -3,12 +3,21 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert } 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import JSZip from 'jszip';
-import * as FileSaver from 'file-saver';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Only import web-specific libraries on web platform
+let JSZip: any = null;
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  JSZip = require('jszip');
+  FileSaver = require('file-saver');
+}
 
 interface StudentProfile {
   id: string;
@@ -178,6 +187,11 @@ export default function ClassView() {
 
   const exportToExcel = () => {
     try {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Feature Not Available', 'Excel export is only available on web platform.');
+        return;
+      }
+
       const data = profiles.map((profile, index) => {
         const studentSubmissions = submissions[profile.student_id] || [];
         const approval = approvals[profile.student_id];
@@ -232,7 +246,6 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
       
-      // For web environment, use XLSX.writeFile
       XLSX.writeFile(workbook, filename);
       
       Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
@@ -244,6 +257,11 @@ export default function ClassView() {
 
   const downloadAllDocuments = async (assignmentType: string) => {
     try {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Feature Not Available', 'Bulk download is only available on web platform.');
+        return;
+      }
+
       setDownloading(assignmentType);
       
       const assignment = STATIC_ASSIGNMENTS.find(a => a.type === assignmentType);
@@ -297,7 +315,7 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
       
-      FileSaver.default.saveAs(zipBlob, zipFileName);
+      FileSaver.saveAs(zipBlob, zipFileName);
       
       Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
     } catch (error) {

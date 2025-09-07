@@ -2,10 +2,18 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChartBar as BarChart3, Users, Building, TrendingUp, Award, Download, ChartPie as PieChart } from 'lucide-react-native';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import * as FileSaver from 'file-saver';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Only import FileSaver on web platform
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  FileSaver = require('file-saver');
+}
 
 interface PlacementStats {
   totalCompanies: number;
@@ -298,11 +306,28 @@ export default function AnalyticsScreen() {
       const classWs = XLSX.utils.aoa_to_sheet(classData);
       XLSX.utils.book_append_sheet(wb, classWs, 'Class Performance');
       
-      // Save the Excel file
       const timestamp = new Date().toISOString().split('T')[0];
-      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      FileSaver.default.saveAs(blob, `Placement_Analytics_Report_${timestamp}.xlsx`);
+      const filename = `Placement_Analytics_Report_${timestamp}.xlsx`;
+      
+      if (Platform.OS === 'web') {
+        // Web platform - use FileSaver
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        FileSaver.saveAs(blob, filename);
+      } else {
+        // Native platform - use FileSystem and Sharing
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+        const uri = FileSystem.documentDirectory + filename;
+        
+        FileSystem.writeAsStringAsync(uri, wbout, {
+          encoding: FileSystem.EncodingType.Base64,
+        }).then(() => {
+          Sharing.shareAsync(uri);
+        }).catch((error) => {
+          console.error('File save error:', error);
+          Alert.alert('Error', 'Failed to save file');
+        });
+      }
       
       Alert.alert('Success', 'Analytics report downloaded successfully as Excel file!');
     } catch (error) {

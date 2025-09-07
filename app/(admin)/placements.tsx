@@ -6,8 +6,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import * as FileSaver from 'file-saver';
-import * as JSZip from 'jszip';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Only import web-specific libraries on web platform
+let JSZip: any = null;
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  JSZip = require('jszip');
+  FileSaver = require('file-saver');
+}
 
 interface PlacementEvent {
   id: string;
@@ -157,6 +166,11 @@ export default function AdminPlacementsScreen() {
 
   const downloadPlacementDocuments = async (event: PlacementEvent) => {
     try {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Feature Not Available', 'Document download is only available on web platform.');
+        return;
+      }
+
       // Load applications for this event if not already loaded
       if (!applications.length || applications[0]?.placement_event_id !== event.id) {
         await loadEventApplications(event.id);
@@ -172,7 +186,7 @@ export default function AdminPlacementsScreen() {
         return;
       }
 
-      const zip = new JSZip.default();
+      const zip = new JSZip();
       let downloadCount = 0;
 
       // Download each offer letter and add to zip
@@ -353,6 +367,11 @@ export default function AdminPlacementsScreen() {
       return;
     }
 
+    if (Platform.OS !== 'web') {
+      Alert.alert('Feature Not Available', 'Excel export is only available on web platform.');
+      return;
+    }
+
     try {
       // Get all additional requirement types from the selected event
       const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
@@ -421,7 +440,7 @@ export default function AdminPlacementsScreen() {
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([wbout], { type: 'application/octet-stream' });
-      FileSaver.default.saveAs(blob, filename);
+      FileSaver.saveAs(blob, filename);
 
       Alert.alert('Success', `Excel file downloaded successfully!`);
     } catch (error) {

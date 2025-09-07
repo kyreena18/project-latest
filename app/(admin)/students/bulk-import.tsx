@@ -6,7 +6,15 @@ import { ChevronLeft, Upload, FileText, Users, Download } from 'lucide-react-nat
 import { supabase } from '@/lib/supabase';
 import * as DocumentPicker from 'expo-document-picker';
 import * as XLSX from 'xlsx';
-import * as FileSaver from 'file-saver';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Only import FileSaver on web platform
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  FileSaver = require('file-saver');
+}
 
 interface StudentData {
   name: string;
@@ -24,6 +32,11 @@ export default function BulkImportScreen() {
 
   const downloadTemplate = () => {
     try {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Feature Not Available', 'Template download is only available on web platform.');
+        return;
+      }
+
       const templateData = [
         ['name', 'uid', 'email', 'roll_no', 'department', 'year'],
         ['John Doe', 'TYIT001', 'john.doe@college.edu', 'TYIT001', 'Computer Science', '3rd Year'],

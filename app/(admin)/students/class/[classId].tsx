@@ -6,6 +6,15 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, User, Mail, Hash, FileText, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+// Only import FileSaver on web platform
+let FileSaver: any = null;
+if (Platform.OS === 'web') {
+  FileSaver = require('file-saver');
+}
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -83,6 +92,11 @@ export default function ClassStudentsView() {
 
   const exportToExcel = () => {
     try {
+      if (Platform.OS !== 'web') {
+        Alert.alert('Feature Not Available', 'Excel export is only available on web platform.');
+        return;
+      }
+
       const data = students.map((student, index) => ({
         'S.No': index + 1,
         'Name': student.name,
