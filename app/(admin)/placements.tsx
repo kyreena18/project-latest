@@ -775,23 +775,7 @@ export default function AdminPlacementsScreen() {
                     {application.application_status === 'accepted' && application.offer_letter_url && (
                       <TouchableOpacity
                         style={styles.viewOfferLetterButton}
-                        onPress={() => {
-                          try {
-                            // Mobile-compatible file viewing
-                            if (Platform.OS === 'web') {
-                              window.open(application.offer_letter_url!, '_blank');
-                            } else {
-                              WebBrowser.openBrowserAsync(application.offer_letter_url!, {
-                                presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                                showTitle: true,
-                                toolbarColor: '#667eea',
-                              });
-                            }
-                          } catch (error) {
-                            console.error('Error opening offer letter:', error);
-                            Alert.alert('Error', 'Failed to open offer letter.');
-                          }
-                        }}
+                        onPress={() => viewOfferLetter(application.offer_letter_url!)}
                       >
                         <FileText size={16} color="#34C759" />
                         <Text style={styles.viewOfferLetterText}>View Offer Letter</Text>

@@ -4,7 +4,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, FileText, Award, CircleCheck as CheckCircle, Download } from 'lucide-react-native';
 import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { STATIC_ASSIGNMENTS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
@@ -296,11 +295,7 @@ export default function ClassView() {
               let downloadCount = 0;
               for (const fileData of fileUrls) {
                 try {
-                  await WebBrowser.openBrowserAsync(fileData.url, {
-                    presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                    showTitle: true,
-                    toolbarColor: '#667eea',
-                  });
+                  await Linking.openURL(fileData.url);
                   downloadCount++;
                   // Small delay between downloads
                   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -351,7 +346,15 @@ export default function ClassView() {
       let downloadCount = 0;
       for (const fileData of fileUrls) {
         try {
-          // Use WebBrowser for better mobile compatibility
+          if (Platform.OS === 'web') {
+            window.open(fileData.url, '_blank');
+          } else {
+            await WebBrowser.openBrowserAsync(fileData.url, {
+              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+              showTitle: true,
+              toolbarColor: '#667eea',
+            });
+          }
           if (Platform.OS === 'web') {
             window.open(fileData.url, '_blank');
           } else {
@@ -366,12 +369,19 @@ export default function ClassView() {
           if (downloadCount < fileUrls.length) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
         } catch (error) {
           console.error(`Failed to open file for ${fileData.studentName}:`, error);
         }
       }
 
-      Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
+      
+      if (downloadCount > 0) {
+        Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents successfully`);
+      } else {
+        Alert.alert('Error', `Failed to open any ${assignment.title} documents`);
+      }
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
@@ -393,11 +403,7 @@ export default function ClassView() {
     }
     try {
       // Mobile-first implementation
-      await WebBrowser.openBrowserAsync(submission.file_url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        showTitle: true,
-        toolbarColor: '#667eea',
-      });
+      await Linking.openURL(submission.file_url);
     } catch (error) {
       Alert.alert('Error', `Failed to open ${title}.`);
     }
