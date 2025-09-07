@@ -309,25 +309,18 @@ export default function AnalyticsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `Placement_Analytics_Report_${timestamp}.xlsx`;
       
-      if (Platform.OS === 'web') {
-        // Web platform - use FileSaver
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([wbout], { type: 'application/octet-stream' });
-        FileSaver.saveAs(blob, filename);
-      } else {
-        // Native platform - use FileSystem and Sharing
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-        const uri = FileSystem.documentDirectory + filename;
-        
-        FileSystem.writeAsStringAsync(uri, wbout, {
-          encoding: FileSystem.EncodingType.Base64,
-        }).then(() => {
-          Sharing.shareAsync(uri);
-        }).catch((error) => {
-          console.error('File save error:', error);
-          Alert.alert('Error', 'Failed to save file');
-        });
-      }
+      // Mobile-first implementation
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const uri = FileSystem.documentDirectory + filename;
+      
+      FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).then(() => {
+        Sharing.shareAsync(uri);
+      }).catch((error) => {
+        console.error('File save error:', error);
+        Alert.alert('Error', 'Failed to save file');
+      });
       
       Alert.alert('Success', 'Analytics report downloaded successfully as Excel file!');
     } catch (error) {

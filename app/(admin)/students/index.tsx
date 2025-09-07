@@ -16,12 +16,20 @@ interface ClassStats {
   color: string;
 }
 
+interface StudentProfile {
+  id: string;
+  full_name: string;
+  uid: string;
+  roll_no: string;
+  class: string;
+}
+
 export default function AdminStudentsScreen() {
   const router = useRouter();
   const [classStats, setClassStats] = useState<ClassStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalStudents, setTotalStudents] = useState(0);
-  const [students, setStudents] = useState<any[]>([]);
+  const [students, setStudents] = useState<StudentProfile[]>([]);
 
   useEffect(() => {
     loadClassStats();
@@ -50,8 +58,10 @@ export default function AdminStudentsScreen() {
       // Real Supabase query
       const { data: profilesData, error: profilesError } = await supabase
         .from('student_profiles')
-        .select('class, full_name, uid, roll_no')
-        .not('class', 'is', null);
+        .select('id, full_name, uid, roll_no, class')
+        .not('class', 'is', null)
+        .order('class')
+        .order('roll_no');
 
       if (profilesError) throw profilesError;
 
@@ -95,7 +105,7 @@ export default function AdminStudentsScreen() {
   };
 
   const getStudentsForClass = (className: string) => {
-    return students.filter(student => student.class === className);
+    return students.filter(student => student.class === className).slice(0, 3);
   };
 
   const navigateToClass = (className: string) => {
@@ -121,7 +131,7 @@ export default function AdminStudentsScreen() {
             style={styles.bulkImportButton}
             onPress={() => router.push('/(admin)/students/bulk-import')}
           >
-            <Plus size={16} color="#FFFFFF" />
+            <Plus size={Math.max(screenWidth * 0.04, 14)} color="#FFFFFF" />
             <Text style={styles.bulkImportText}>Import</Text>
           </TouchableOpacity>
           <View style={styles.headerStats}>
@@ -133,7 +143,7 @@ export default function AdminStudentsScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.overviewCard}>
           <View style={styles.overviewHeader}>
-            <Users size={32} color="#007AFF" />
+            <Users size={Math.max(screenWidth * 0.08, 28)} color="#007AFF" />
             <View style={styles.overviewInfo}>
               <Text style={styles.overviewTitle}>Student Overview</Text>
               <Text style={styles.overviewSubtitle}>
@@ -158,7 +168,7 @@ export default function AdminStudentsScreen() {
               <View key={classItem.className} style={styles.classCard}>
                 <View style={styles.classHeader}>
                   <View style={[styles.classIcon, { backgroundColor: classItem.color }]}>
-                    <GraduationCap size={24} color="#FFFFFF" />
+                    <GraduationCap size={Math.max(screenWidth * 0.06, 20)} color="#FFFFFF" />
                   </View>
                   <View style={styles.classInfo}>
                     <Text style={styles.className}>{classItem.className}</Text>
@@ -173,7 +183,7 @@ export default function AdminStudentsScreen() {
                 
                 {/* Show first few students from this class */}
                 <View style={styles.studentsPreview}>
-                  {getStudentsForClass(classItem.className).slice(0, 3).map((student, index) => (
+                  {getStudentsForClass(classItem.className).map((student, index) => (
                     <View key={index} style={styles.studentPreviewCard}>
                       <View style={styles.studentAvatar}>
                         <Text style={styles.studentAvatarText}>
@@ -200,7 +210,7 @@ export default function AdminStudentsScreen() {
                   onPress={() => navigateToClass(classItem.className)}
                 >
                   <Text style={styles.viewStudentsText}>View Students</Text>
-                  <ChevronRight size={16} color="#007AFF" />
+                  <ChevronRight size={Math.max(screenWidth * 0.04, 14)} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             ))}
@@ -231,19 +241,19 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: screenWidth * 0.03,
   },
   bulkImportButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#34C759',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
+    borderRadius: screenWidth * 0.02,
+    paddingHorizontal: screenWidth * 0.03,
+    paddingVertical: screenHeight * 0.008,
+    gap: screenWidth * 0.015,
   },
   bulkImportText: {
-    fontSize: 12,
+    fontSize: Math.max(screenWidth * 0.03, 11),
     color: '#FFFFFF',
     fontWeight: '600',
   },
@@ -427,10 +437,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     marginBottom: screenHeight * 0.002,
+    flexWrap: 'wrap',
   },
   studentPreviewDetails: {
     fontSize: Math.max(screenWidth * 0.03, 10),
     color: '#6B6B6B',
+    flexWrap: 'wrap',
   },
   moreStudentsText: {
     fontSize: Math.max(screenWidth * 0.03, 10),

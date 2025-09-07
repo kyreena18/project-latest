@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
 import { Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, User, Mail, Hash, FileText, Download } from 'lucide-react-native';
+import { ChevronLeft, User, Hash, FileText, Download } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// Only import FileSaver on web platform
-let FileSaver: any = null;
-if (Platform.OS === 'web') {
-  FileSaver = require('file-saver');
-}
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -25,7 +18,6 @@ interface Student {
   roll_no: string;
   email: string;
   class: string;
-  total_credits: number;
 }
 
 export default function ClassStudentsView() {
@@ -60,10 +52,11 @@ export default function ClassStudentsView() {
             roll_no: rollNo,
             email: `student${i}@college.edu`,
             class: String(classId),
-            total_credits: Math.floor(Math.random() * 10),
           });
         }
 
+        // Sort by roll number
+        mockStudents.sort((a, b) => a.roll_no.localeCompare(b.roll_no));
         setStudents(mockStudents);
         setLoading(false);
         return;
@@ -99,8 +92,10 @@ export default function ClassStudentsView() {
           roll_no: profile.roll_no,
           email: profile.students?.email || '',
           class: profile.class,
-          total_credits: 0 // Remove credits display
         }));
+        
+        // Sort by roll number
+        transformedData.sort((a, b) => a.roll_no.localeCompare(b.roll_no));
         setStudents(transformedData);
       }
     } catch (error) {
@@ -111,7 +106,7 @@ export default function ClassStudentsView() {
     }
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     try {
       const data = students.map((student, index) => ({
         'S.No': index + 1,
@@ -139,23 +134,15 @@ export default function ClassStudentsView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Students_${timestamp}.xlsx`;
       
-      if (Platform.OS === 'web') {
-        XLSX.writeFile(workbook, filename);
-      } else {
-        // Mobile implementation
-        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-        const uri = FileSystem.documentDirectory + filename;
-        
-        FileSystem.writeAsStringAsync(uri, wbout, {
-          encoding: FileSystem.EncodingType.Base64,
-        }).then(() => {
-          Sharing.shareAsync(uri);
-        }).catch((error) => {
-          console.error('File save error:', error);
-          Alert.alert('Error', 'Failed to save file');
-        });
-      }
+      // Mobile-first implementation
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+      const uri = FileSystem.documentDirectory + filename;
       
+      await FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      await Sharing.shareAsync(uri);
       Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
     } catch (error) {
       console.error('Excel generation error:', error);
@@ -178,10 +165,10 @@ export default function ClassStudentsView() {
       <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={20} color="#FFFFFF" />
+            <ChevronLeft size={Math.max(screenWidth * 0.05, 18)} color="#FFFFFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Class: {String(classId)}</Text>
-          <View style={{ width: 36 }} />
+          <View style={{ width: Math.max(screenWidth * 0.09, 32) }} />
         </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading students...</Text>
@@ -194,11 +181,11 @@ export default function ClassStudentsView() {
     <LinearGradient colors={['#667eea', '#764ba2']} style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ChevronLeft size={20} color="#FFFFFF" />
+          <ChevronLeft size={Math.max(screenWidth * 0.05, 18)} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Class: {String(classId)}</Text>
         <TouchableOpacity style={styles.exportButton} onPress={exportToExcel}>
-          <Download size={16} color="#FFFFFF" />
+          <Download size={Math.max(screenWidth * 0.04, 14)} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
@@ -210,7 +197,7 @@ export default function ClassStudentsView() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {students.length === 0 ? (
           <View style={styles.emptyState}>
-            <User size={64} color="#6B6B6B" />
+            <User size={Math.max(screenWidth * 0.16, 56)} color="#6B6B6B" />
             <Text style={styles.emptyStateTitle}>No Students Found</Text>
             <Text style={styles.emptyStateText}>
               No students are registered in {String(classId)} class yet.
@@ -230,17 +217,14 @@ export default function ClassStudentsView() {
                     <Text style={styles.studentName}>{student.name}</Text>
                     <View style={styles.studentDetails}>
                       <View style={styles.detailRow}>
-                        <Hash size={14} color="#6B6B6B" />
+                        <Hash size={Math.max(screenWidth * 0.035, 12)} color="#6B6B6B" />
                         <Text style={styles.detailText}>UID: {student.uid}</Text>
                       </View>
                       <View style={styles.detailRow}>
-                        <FileText size={14} color="#6B6B6B" />
+                        <FileText size={Math.max(screenWidth * 0.035, 12)} color="#6B6B6B" />
                         <Text style={styles.detailText}>Roll: {student.roll_no}</Text>
                       </View>
                     </View>
-                  </View>
-                </View>
-                  <View style={styles.creditsInfo}>
                   </View>
                 </View>
               </View>
@@ -396,7 +380,5 @@ const styles = StyleSheet.create({
     color: '#6B6B6B',
     flexWrap: 'wrap',
     flex: 1,
-  },
-  creditsInfo: {
   },
 });

@@ -181,63 +181,31 @@ export default function AdminPlacementsScreen() {
         return;
       }
 
-      if (Platform.OS === 'web') {
-        const zip = new JSZip();
-        let downloadCount = 0;
-
-        // Download each offer letter and add to zip
-        for (const application of acceptedWithOfferLetters) {
-          try {
-            const response = await fetch(application.offer_letter_url!);
-            if (response.ok) {
-              const blob = await response.blob();
-              const fileExtension = application.offer_letter_url!.split('.').pop() || 'pdf';
-              const fileName = `${application.students.roll_no}_${application.students.student_profiles?.full_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Unknown'}.${fileExtension}`;
-              zip.file(fileName, blob);
-              downloadCount++;
-            }
-          } catch (error) {
-            console.error(`Failed to download offer letter for ${application.students.name}:`, error);
-          }
-        }
-
-        if (downloadCount === 0) {
-          Alert.alert('Download Failed', 'Could not download any offer letters.');
-          return;
-        }
-
-        // Generate and download zip file
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const timestamp = new Date().toISOString().split('T')[0];
-        const zipFileName = `${event.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_Offer_Letters_${timestamp}.zip`;
-        
-        FileSaver.saveAs(zipBlob, zipFileName);
-        
-        Alert.alert('Success', `Downloaded ${downloadCount} offer letters in ${zipFileName}`);
-      } else {
-        // Mobile implementation - share individual files or create a simple list
-        Alert.alert(
-          'Download Offer Letters',
-          `Found ${acceptedWithOfferLetters.length} offer letters. They will be opened individually for download.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Download All', 
-              onPress: async () => {
-                for (const application of acceptedWithOfferLetters) {
-                  try {
-                    await Linking.openURL(application.offer_letter_url!);
-                    // Small delay between downloads
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                  } catch (error) {
-                    console.error(`Failed to open offer letter for ${application.students.name}:`, error);
-                  }
+      // Mobile-first implementation - open individual files
+      Alert.alert(
+        'Download Offer Letters',
+        `Found ${acceptedWithOfferLetters.length} offer letters. They will be opened individually for download.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Download All', 
+            onPress: async () => {
+              let downloadCount = 0;
+              for (const application of acceptedWithOfferLetters) {
+                try {
+                  await Linking.openURL(application.offer_letter_url!);
+                  downloadCount++;
+                  // Small delay between downloads
+                  await new Promise(resolve => setTimeout(resolve, 1500));
+                } catch (error) {
+                  console.error(`Failed to open offer letter for ${application.students.name}:`, error);
                 }
               }
+              Alert.alert('Success', `Opened ${downloadCount} offer letters for download`);
             }
-          ]
-        );
-      }
+          }
+        ]
+      );
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', 'Failed to download offer letters.');
@@ -439,12 +407,8 @@ export default function AdminPlacementsScreen() {
         'Application Status': application.application_status.toUpperCase(),
         'Applied Date': formatDate(application.applied_at),
         'Admin Notes': application.admin_notes || 'No notes',
-        'Resume Link': application.students?.student_profiles?.resume_url 
-          ? `=HYPERLINK("${application.students.student_profiles.resume_url}","View Resume")`
-          : 'Not uploaded',
-        'Offer Letter Link': application.offer_letter_url 
-          ? `=HYPERLINK("${application.offer_letter_url}","View Offer Letter")`
-          : (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
+        'Resume Link': application.students?.student_profiles?.resume_url || 'Not uploaded',
+        'Offer Letter Link': application.offer_letter_url || (application.application_status === 'accepted' ? 'Not uploaded' : 'Not accepted'),
         // Add additional requirement submission links
         ...additionalRequirementTypes.reduce((acc, type) => {
           const reqLabel = type.replace('_', ' ').split(' ').map(word => 
@@ -457,11 +421,7 @@ export default function AdminPlacementsScreen() {
             sub.placement_requirements.type === type
           );
           
-          if (submission?.file_url) {
-            acc[reqKey] = `=HYPERLINK("${submission.file_url}","View ${reqLabel}")`;
-          } else {
-            acc[reqKey] = 'Not submitted';
-          }
+          acc[reqKey] = submission?.file_url || 'Not submitted';
           return acc;
         }, {} as Record<string, string>),
       }));
@@ -491,24 +451,18 @@ export default function AdminPlacementsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
 
-      if (Platform.OS === 'web') {
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([wbout], { type: 'application/octet-stream' });
-        FileSaver.saveAs(blob, filename);
-      } else {
-        // Mobile implementation
-        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
-        const uri = FileSystem.documentDirectory + filename;
-        
-        FileSystem.writeAsStringAsync(uri, wbout, {
-          encoding: FileSystem.EncodingType.Base64,
-        }).then(() => {
-          Sharing.shareAsync(uri);
-        }).catch((error) => {
-          console.error('File save error:', error);
-          Alert.alert('Error', 'Failed to save file');
-        });
-      }
+      // Mobile-first implementation
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+      const uri = FileSystem.documentDirectory + filename;
+      
+      FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).then(() => {
+        Sharing.shareAsync(uri);
+      }).catch((error) => {
+        console.error('File save error:', error);
+        Alert.alert('Error', 'Failed to save file');
+      });
 
       Alert.alert('Success', `Excel file downloaded successfully!`);
     } catch (error) {
@@ -823,16 +777,8 @@ export default function AdminPlacementsScreen() {
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
                           try {
-                            if (Platform.OS === 'web') {
-                              // Force the URL to open in browser for viewing instead of downloading
-                              const viewUrl = application.offer_letter_url.includes('?') 
-                                ? `${application.offer_letter_url}&view=true` 
-                                : `${application.offer_letter_url}?view=true`;
-                              window.open(viewUrl, '_blank');
-                            } else {
-                              // Mobile implementation
-                              Linking.openURL(application.offer_letter_url);
-                            }
+                            // Mobile-first implementation
+                            Linking.openURL(application.offer_letter_url);
                           } catch (error) {
                             Alert.alert('Error', 'Failed to open offer letter.');
                           }

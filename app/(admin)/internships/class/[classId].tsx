@@ -202,15 +202,7 @@ export default function ClassView() {
         // Add document columns
         STATIC_ASSIGNMENTS.forEach(assignment => {
           const submission = studentSubmissions.find(sub => sub.assignment_type === assignment.type);
-          if (submission?.file_url) {
-            if (Platform.OS === 'web') {
-              row[assignment.title] = `=HYPERLINK("${submission.file_url}","View ${assignment.title}")`;
-            } else {
-              row[assignment.title] = submission.file_url;
-            }
-          } else {
-            row[assignment.title] = 'Not Submitted';
-          }
+          row[assignment.title] = submission?.file_url || 'Not Submitted';
         });
 
         row['Offer Letter Approved'] = approval?.offer_letter_approved ? 'Yes' : 'No';
@@ -245,22 +237,18 @@ export default function ClassView() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${classId}_Internship_Report_${timestamp}.xlsx`;
       
-      if (Platform.OS === 'web') {
-        XLSX.writeFile(workbook, filename);
-      } else {
-        // Mobile implementation
-        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
-        const uri = FileSystem.documentDirectory + filename;
-        
-        FileSystem.writeAsStringAsync(uri, wbout, {
-          encoding: FileSystem.EncodingType.Base64,
-        }).then(() => {
-          Sharing.shareAsync(uri);
-        }).catch((error) => {
-          console.error('File save error:', error);
-          Alert.alert('Error', 'Failed to save file');
-        });
-      }
+      // Mobile-first implementation
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+      const uri = FileSystem.documentDirectory + filename;
+      
+      FileSystem.writeAsStringAsync(uri, wbout, {
+        encoding: FileSystem.EncodingType.Base64,
+      }).then(() => {
+        Sharing.shareAsync(uri);
+      }).catch((error) => {
+        console.error('File save error:', error);
+        Alert.alert('Error', 'Failed to save file');
+      });
       
       Alert.alert('Success', `Excel report for ${classId} downloaded successfully!`);
     } catch (error) {
@@ -295,66 +283,31 @@ export default function ClassView() {
         return;
       }
 
-      if (Platform.OS === 'web') {
-        const zip = new JSZip();
-        let downloadCount = 0;
-
-        // Download each file and add to zip
-        for (const fileData of fileUrls) {
-          try {
-            const response = await fetch(fileData.url);
-            if (response.ok) {
-              const blob = await response.blob();
-              const fileExtension = fileData.url.split('.').pop() || 'pdf';
-              const fileName = `${fileData.rollNo}_${fileData.studentName.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`;
-              zip.file(fileName, blob);
-              downloadCount++;
-            }
-          } catch (error) {
-            console.error(`Failed to download file for ${fileData.studentName}:`, error);
-          }
-        }
-
-        if (downloadCount === 0) {
-          Alert.alert('Download Failed', 'Could not download any documents.');
-          return;
-        }
-
-        // Generate and download zip file
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const timestamp = new Date().toISOString().split('T')[0];
-        const zipFileName = `${classId}_${assignment.title.replace(/\s+/g, '_')}_${timestamp}.zip`;
-        
-        FileSaver.saveAs(zipBlob, zipFileName);
-        
-        Alert.alert('Success', `Downloaded ${downloadCount} ${assignment.title} documents in ${zipFileName}`);
-      } else {
-        // Mobile implementation - open each document individually
-        Alert.alert(
-          'Download Documents',
-          `Found ${fileUrls.length} ${assignment.title} documents. They will be opened individually for download.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Download All', 
-              onPress: async () => {
-                let downloadCount = 0;
-                for (const fileData of fileUrls) {
-                  try {
-                    await Linking.openURL(fileData.url);
-                    downloadCount++;
-                    // Small delay between downloads
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                  } catch (error) {
-                    console.error(`Failed to open file for ${fileData.studentName}:`, error);
-                  }
+      // Mobile-first implementation - open each document individually
+      Alert.alert(
+        'Download Documents',
+        `Found ${fileUrls.length} ${assignment.title} documents. They will be opened individually for download.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Download All', 
+            onPress: async () => {
+              let downloadCount = 0;
+              for (const fileData of fileUrls) {
+                try {
+                  await Linking.openURL(fileData.url);
+                  downloadCount++;
+                  // Small delay between downloads
+                  await new Promise(resolve => setTimeout(resolve, 1500));
+                } catch (error) {
+                  console.error(`Failed to open file for ${fileData.studentName}:`, error);
                 }
-                Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
               }
+              Alert.alert('Success', `Opened ${downloadCount} ${assignment.title} documents for download`);
             }
-          ]
-        );
-      }
+          }
+        ]
+      );
     } catch (error) {
       console.error('Bulk download error:', error);
       Alert.alert('Error', `Failed to download ${assignment?.title} documents.`);
@@ -423,16 +376,8 @@ export default function ClassView() {
       return;
     }
     try {
-      if (Platform.OS === 'web') {
-        // Force the URL to open in browser for viewing instead of downloading
-        const viewUrl = submission.file_url.includes('?') 
-          ? `${submission.file_url}&view=true` 
-          : `${submission.file_url}?view=true`;
-        await Linking.openURL(viewUrl);
-      } else {
-        // Mobile implementation
-        await Linking.openURL(submission.file_url);
-      }
+      // Mobile-first implementation
+      await Linking.openURL(submission.file_url);
     } catch (error) {
       Alert.alert('Error', `Failed to open ${title}.`);
     }
