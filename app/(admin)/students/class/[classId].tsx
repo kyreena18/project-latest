@@ -239,6 +239,7 @@ export default function ClassStudentsView() {
                       </View>
                     </View>
                   </View>
+                </View>
                   <View style={styles.creditsInfo}>
                   </View>
                 </View>
