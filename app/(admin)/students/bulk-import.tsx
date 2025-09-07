@@ -24,7 +24,7 @@ export default function BulkImportScreen() {
   const [importing, setImporting] = useState(false);
   const [previewData, setPreviewData] = useState<StudentData[]>([]);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
     try {
       const templateData = [
         ['name', 'uid', 'email', 'roll_no', 'department', 'year'],

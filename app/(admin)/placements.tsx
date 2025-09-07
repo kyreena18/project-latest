@@ -345,7 +345,7 @@ export default function AdminPlacementsScreen() {
     }
   };
 
-  const exportApplicationsToExcel = () => {
+  const exportApplicationsToExcel = async () => {
     if (!selectedEvent || applications.length === 0) {
       Alert.alert('No Data', 'No applications to export');
       return;

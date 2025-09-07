@@ -178,7 +178,7 @@ export default function ClassView() {
     }
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     try {
       const data = profiles.map((profile, index) => {
         const studentSubmissions = submissions[profile.student_id] || [];
