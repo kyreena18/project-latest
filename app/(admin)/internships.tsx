@@ -5,9 +5,8 @@ import { GraduationCap, ChevronRight } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { Platform, Alert } from 'react-native';
+import { Alert } from 'react-native';
+import { downloadFileWithFallback } from '@/lib/utils';
 
 interface ClassStats {
   className: string;
@@ -111,7 +110,13 @@ export default function AdminInternshipsScreen() {
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `Internships_ClassStats_${timestamp}.xlsx`;
 
-      await saveAndShareBase64(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      
+      if (success) {
+        Alert.alert('Success', 'Class stats exported successfully!');
+      } else {
+        Alert.alert('Export Failed', 'Could not export class stats to Excel.');
+      }
     } catch (err) {
       console.error('Excel generation error (internships):', err);
       Alert.alert('Export Failed', 'Could not generate Excel file.');
@@ -120,34 +125,6 @@ export default function AdminInternshipsScreen() {
     }
   };
 
-  // Utility: save & share base64 data (works on mobile and web)
-  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        // Web fallback: create anchor with data URL
-        const link = document.createElement('a');
-        link.href = `data:${mime};base64,${base64Data}`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        return;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-      // Sharing
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share Excel file' });
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-      }
-    } catch (err) {
-      console.error('saveAndShareBase64 error:', err);
-      Alert.alert('Error', 'Failed to save or share file.');
-    }
-  };
 
   if (loading) {
     return (

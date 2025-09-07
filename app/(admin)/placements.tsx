@@ -5,9 +5,7 @@ import { Plus, X, Download, FileText, Eye, Briefcase, User } from 'lucide-react-
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import { formatDate, getStatusColor } from '@/lib/utils';
+import { formatDate, getStatusColor, downloadFileWithFallback } from '@/lib/utils';
 import * as WebBrowser from 'expo-web-browser';
 
 interface PlacementEvent {
@@ -81,66 +79,6 @@ export default function AdminPlacementsScreen() {
     loadPlacementEvents();
   }, []);
 
-  // Helper function to save and share base64 content (works on mobile and web)
-  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const link = document.createElement('a');
-        link.href = `data:${mime};base64,${base64Data}`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareBase64 error:', err);
-      return false;
-    }
-  };
-
-  // Helper function to save and share text content
-  const saveAndShareText = async (content: string, filename: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Share text file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareText error:', err);
-      return false;
-    }
-  };
 
   const loadPlacementEvents = async () => {
     try {
@@ -278,7 +216,7 @@ export default function AdminPlacementsScreen() {
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
-      const success = await saveAndShareBase64(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const success = await downloadFileWithFallback(wbout, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
       if (success) {
         Alert.alert('Success', 'Excel file ready for download!');
@@ -345,7 +283,7 @@ export default function AdminPlacementsScreen() {
 
       const filename = `${event.company_name}_offer_letters_${new Date().toISOString().split('T')[0]}.txt`;
 
-      const success = await saveAndShareText(content, filename);
+      const success = await downloadFileWithFallback(content, filename, 'text/plain');
 
       if (success) {
         Alert.alert('Success', `Offer letter links prepared for ${acceptedWithOfferLetters.length} students.`);
@@ -812,17 +750,23 @@ export default function AdminPlacementsScreen() {
                       <TouchableOpacity
                         style={styles.viewOfferLetterButton}
                         onPress={() => {
+                          if (!application.offer_letter_url) {
+                            Alert.alert('No Offer Letter', 'Offer letter URL is not available for this application.');
+                            return;
+                          }
                           try {
                             WebBrowser.openBrowserAsync(application.offer_letter_url!, {
-                              presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+                              presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
                               showTitle: true,
                               toolbarColor: '#667eea',
                               controlsColor: '#FFFFFF',
-                              showInRecents: true
+                              showInRecents: true,
+                              enableBarCollapsing: true,
+                              dismissButtonStyle: WebBrowser.WebBrowserDismissButtonStyle.CLOSE
                             });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
-                            Alert.alert('Error', 'Failed to open offer letter.');
+                            Alert.alert('Error', 'Failed to open offer letter. Please check if the URL is valid.');
                           }
                         }}
                       >
