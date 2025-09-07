@@ -1,3 +1,5 @@
+global.app = global.app || {};
+
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
