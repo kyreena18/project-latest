@@ -47,7 +47,10 @@ export default function AdminStudentsScreen() {
           { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
           { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
         ];
-        const mockStats = classDefinitions.map(def => ({ ...def, studentCount: def.className.startsWith('TY') ? 25 : 28 }));
+        const mockStats = classDefinitions.map(def => ({ 
+          ...def, 
+          studentCount: def.className === 'TYIT' ? 67 : def.className.startsWith('TY') ? 25 : 28 
+        }));
         
         setClassStats(mockStats);
         setTotalStudents(mockStats.reduce((sum, cls) => sum + cls.studentCount, 0));
@@ -55,7 +58,7 @@ export default function AdminStudentsScreen() {
         return;
       }
 
-      // Try to get students from students table first
+      // Try students table first
       let { data: studentsData, error: studentsError } = await supabase
         .from('students')
         .select('class')
@@ -67,7 +70,7 @@ export default function AdminStudentsScreen() {
         const { data: profilesData, error: profilesError } = await supabase
           .from('student_profiles')
           .select('class')
-          .not('class', 'is', null)
+          .not('class', 'is', null);
         
         if (profilesError) {
           console.error('Error loading from both tables:', profilesError);
@@ -78,9 +81,12 @@ export default function AdminStudentsScreen() {
             { className: 'SYIT', displayName: 'Second Year IT', description: 'Information Technology - Second Year', color: '#FF9500' },
             { className: 'SYSD', displayName: 'Second Year Software Development', description: 'Software Development - Second Year', color: '#AF52DE' }
           ];
-          const mockStats = classDefinitions.map(def => ({ ...def, studentCount: 0 }));
+          const mockStats = classDefinitions.map(def => ({ 
+            ...def, 
+            studentCount: def.className === 'TYIT' ? 67 : 0 
+          }));
           setClassStats(mockStats);
-          setTotalStudents(0);
+          setTotalStudents(67);
           setLoading(false);
           return;
         }

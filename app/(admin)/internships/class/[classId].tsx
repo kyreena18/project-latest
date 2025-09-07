@@ -58,19 +58,26 @@ export default function ClassView() {
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock data for development
         const mockProfiles: StudentProfile[] = [];
-        const studentCount = String(classId).startsWith('TY') ? 25 : 22;
+        const studentCount = String(classId) === 'TYIT' ? 67 : String(classId).startsWith('TY') ? 25 : 22;
         
         for (let i = 1; i <= studentCount; i++) {
-          const rollNo = `${classId}${i.toString().padStart(3, '0')}`;
+          const rollNo = i.toString();
           mockProfiles.push({
             id: `mock-profile-${classId}-${i}`,
             student_id: `mock-student-${classId}-${i}`,
             full_name: `Student ${i} Full Name`,
-            uid: rollNo,
+            uid: `${classId}${i.toString().padStart(3, '0')}`,
             roll_no: rollNo,
             class: String(classId),
           });
         }
+
+        // Sort by roll number (numeric)
+        mockProfiles.sort((a, b) => {
+          const rollA = parseInt(a.roll_no);
+          const rollB = parseInt(b.roll_no);
+          return rollA - rollB;
+        });
 
         setProfiles(mockProfiles);
         setSubmissions({});
@@ -79,20 +86,42 @@ export default function ClassView() {
         return;
       }
 
-      // Load student profiles
-      const { data: profs, error: profsError } = await supabase
-        .from('student_profiles')
+      // Try students table first, then student_profiles as fallback
+      let { data: profs, error: profsError } = await supabase
+        .from('students')
         .select('id, student_id, full_name, uid, roll_no, class')
         .eq('class', String(classId));
 
-      if (profsError) {
-        console.error('Error loading profiles:', profsError);
-        setProfiles([]);
-        setLoading(false);
-        return;
+      // If students table fails or is empty, try student_profiles
+      if (profsError || !profs || profs.length === 0) {
+        console.log('Trying student_profiles table...');
+        const { data: profileData, error: profileError } = await supabase
+          .from('student_profiles')
+          .select('id, student_id, full_name, uid, roll_no, class')
+          .eq('class', String(classId));
+
+        if (profileError) {
+          console.error('Error loading from both tables:', profileError);
+          setProfiles([]);
+          setLoading(false);
+          return;
+        }
+        profs = profileData;
       }
 
-      setProfiles(profs || []);
+      // Sort profiles by roll number (numeric sorting)
+      const sortedProfiles = (profs || []).sort((a, b) => {
+        const extractNumber = (rollNo: string) => {
+          const match = rollNo.match(/(\d+)$/);
+          return match ? parseInt(match[1]) : parseInt(rollNo) || 0;
+        };
+        
+        const rollA = extractNumber(a.roll_no);
+        const rollB = extractNumber(b.roll_no);
+        return rollA - rollB;
+      });
+
+      setProfiles(sortedProfiles);
 
       if (profs && profs.length > 0) {
         const studentIds = profs.map(p => p.student_id);

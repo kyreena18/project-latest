@@ -40,24 +40,24 @@ export default function ClassStudentsView() {
       if (!supabaseUrl || supabaseUrl.includes('your-project-id')) {
         // Mock data for development
         const mockStudents: Student[] = [];
-        const studentCount = String(classId).startsWith('TY') ? 25 : 22;
+        const studentCount = String(classId) === 'TYIT' ? 67 : String(classId).startsWith('TY') ? 25 : 22;
         
         for (let i = 1; i <= studentCount; i++) {
-          const rollNo = `${i.toString().padStart(3, '0')}`;
+          const rollNo = i.toString();
           mockStudents.push({
             id: `mock-student-${classId}-${i}`,
             name: `Student ${i} Full Name`,
-            uid: `${classId}${rollNo}`,
+            uid: `${classId}${i.toString().padStart(3, '0')}`,
             roll_no: rollNo,
             email: `student${i}@college.edu`,
             class: String(classId),
           });
         }
 
-        // Sort by roll number
+        // Sort by roll number (numeric)
         mockStudents.sort((a, b) => {
-          const rollA = parseInt(a.roll_no) || 0;
-          const rollB = parseInt(b.roll_no) || 0;
+          const rollA = parseInt(a.roll_no);
+          const rollB = parseInt(b.roll_no);
           return rollA - rollB;
         });
         setStudents(mockStudents);
@@ -65,49 +65,81 @@ export default function ClassStudentsView() {
         return;
       }
 
-      // Real Supabase query
-      const { data, error } = await supabase
-        .from('student_profiles')
+      // Try students table first, then student_profiles as fallback
+      let { data, error } = await supabase
+        .from('students')
         .select(`
           id,
-          student_id,
-          full_name,
+          name,
           uid,
           roll_no,
           class,
-          students!inner(
-            name,
-            email
-          )
+          email
         `)
         .eq('class', String(classId))
         .order('roll_no');
 
-      if (error) {
-        console.error('Error loading students:', error);
-        setStudents([]);
-      } else {
-        // Transform the data to match the Student interface
-        const transformedData = (data || []).map(profile => ({
+      // If students table fails or is empty, try student_profiles
+      if (error || !data || data.length === 0) {
+        console.log('Trying student_profiles table...');
+        const { data: profileData, error: profileError } = await supabase
+          .from('student_profiles')
+          .select(`
+            id,
+            student_id,
+            full_name,
+            uid,
+            roll_no,
+            class,
+            email,
+            students!inner(
+              name,
+              email
+            )
+          `)
+          .eq('class', String(classId))
+          .order('roll_no');
+
+        if (profileError) {
+          console.error('Error loading from both tables:', profileError);
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
+
+        // Transform profile data
+        data = (profileData || []).map(profile => ({
           id: profile.id,
           name: profile.full_name || profile.students?.name || 'Unknown',
           uid: profile.uid,
           roll_no: profile.roll_no,
-          email: profile.students?.email || '',
+          email: profile.email || profile.students?.email || '',
           class: profile.class,
         }));
+      }
+
+      // Sort by roll number (numeric sorting)
+      const sortedData = (data || []).sort((a, b) => {
+        // Extract numeric part from roll number for proper sorting
+        const extractNumber = (rollNo: string) => {
+          // Handle various roll number formats
+          const match = rollNo.match(/(\d+)$/);
+          return match ? parseInt(match[1]) : parseInt(rollNo) || 0;
+        };
         
-        // Sort by roll number
-        transformedData.sort((a, b) => {
-          // Extract numeric part from roll number for proper sorting
-          const extractNumber = (rollNo: string) => {
-            const match = rollNo.match(/(\d+)$/);
-            return match ? parseInt(match[1]) : 0;
-          };
-          
-          const rollA = extractNumber(a.roll_no);
-          const rollB = extractNumber(b.roll_no);
-          return rollA - rollB;
+        const rollA = extractNumber(a.roll_no);
+        const rollB = extractNumber(b.roll_no);
+        return rollA - rollB;
+      });
+
+      setStudents(sortedData);
+    } catch (error) {
+      console.error('Error loading students:', error);
+      setStudents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
         });
         setStudents(transformedData);
       }
