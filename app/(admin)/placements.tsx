@@ -81,6 +81,67 @@ export default function AdminPlacementsScreen() {
     loadPlacementEvents();
   }, []);
 
+  // Helper function to save and share base64 content (works on mobile and web)
+  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        const link = document.createElement('a');
+        link.href = `data:${mime};base64,${base64Data}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        return true;
+      }
+
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share file' });
+        return true;
+      } else {
+        Alert.alert('Saved', `File saved to ${fileUri}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('saveAndShareBase64 error:', err);
+      return false;
+    }
+  };
+
+  // Helper function to save and share text content
+  const saveAndShareText = async (content: string, filename: string) => {
+    try {
+      if (Platform.OS === 'web') {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+        return true;
+      }
+
+      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
+      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, { dialogTitle: 'Share text file' });
+        return true;
+      } else {
+        Alert.alert('Saved', `File saved to ${fileUri}`);
+        return true;
+      }
+    } catch (err) {
+      console.error('saveAndShareText error:', err);
+      return false;
+    }
+  };
+
   const loadPlacementEvents = async () => {
     try {
       const { data, error } = await supabase
@@ -98,7 +159,7 @@ export default function AdminPlacementsScreen() {
   };
 
   // Return loaded applications and set state
-  const loadEventApplications = async (eventId: string) => {
+  const loadEventApplications = async (eventId: string): Promise<PlacementApplication[]> => {
     try {
       const { data, error } = await supabase
         .from('placement_applications')
@@ -163,80 +224,19 @@ export default function AdminPlacementsScreen() {
     }
   };
 
-  // Save base64 content to file and share - mobile & web fallback
-  const saveAndShareBase64 = async (base64Data: string, filename: string, mime: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const link = document.createElement('a');
-        link.href = `data:${mime};base64,${base64Data}`;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { mimeType: mime, dialogTitle: 'Share file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareBase64 error:', err);
-      return false;
-    }
-  };
-
-  // Save text content (UTF-8) and share
-  const saveAndShareText = async (content: string, filename: string) => {
-    try {
-      if (Platform.OS === 'web') {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-        return true;
-      }
-
-      const fileUri = `${FileSystem.cacheDirectory}${filename}`;
-      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        await Sharing.shareAsync(fileUri, { dialogTitle: 'Share text file' });
-        return true;
-      } else {
-        Alert.alert('Saved', `File saved to ${fileUri}`);
-        return true;
-      }
-    } catch (err) {
-      console.error('saveAndShareText error:', err);
-      return false;
-    }
-  };
-
-  // Export applications to Excel for selectedEvent
-  const exportApplicationsToExcel = async () => {
-    if (!selectedEvent || applications.length === 0) {
-      Alert.alert('No Data', 'No applications to export');
+  // Export applications to Excel for any event
+  const exportApplicationsToExcel = async (event: PlacementEvent, eventApplications: PlacementApplication[]) => {
+    if (!event || eventApplications.length === 0) {
+      Alert.alert('No Data', 'No applications to export for this event');
       return;
     }
 
     try {
-      setDownloading(`excel_${selectedEvent.id}`);
+      setDownloading(`excel_${event.id}`);
 
-      const additionalRequirementTypes = (selectedEvent.additional_requirements || []).map((r: { type: string }) => r.type);
+      const additionalRequirementTypes = (event.additional_requirements || []).map((r: { type: string }) => r.type);
 
-      const exportData = applications.map((application, index) => ({
+      const exportData = eventApplications.map((application, index) => ({
         'S.No': index + 1,
         'Full Name': application.students?.student_profiles?.full_name || application.students?.name || 'N/A',
         'UID': application.students?.uid || 'N/A',
@@ -274,7 +274,7 @@ export default function AdminPlacementsScreen() {
       XLSX.utils.book_append_sheet(wb, ws, 'Applications');
 
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `${selectedEvent.company_name}_${selectedEvent.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
+      const filename = `${event.company_name}_${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_Applications_${timestamp}.xlsx`;
 
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
 
@@ -289,7 +289,7 @@ export default function AdminPlacementsScreen() {
       console.error('Export error:', error);
       Alert.alert('Export Failed', 'Could not export applications to Excel');
     } finally {
-      if (selectedEvent) setDownloading(null);
+      setDownloading(null);
     }
   };
 
@@ -298,15 +298,14 @@ export default function AdminPlacementsScreen() {
     try {
       setDownloading(`offers_${event.id}`);
 
-      // ensure applications for this event are loaded
-      const apps = (applications.length && applications[0]?.placement_event_id === event.id) ? applications : await loadEventApplications(event.id);
+      // Load applications for this specific event
+      const apps = await loadEventApplications(event.id);
 
       const acceptedWithOfferLetters = (apps || []).filter(app =>
         app.application_status === 'accepted' && app.offer_letter_url
       );
 
       if (acceptedWithOfferLetters.length === 0) {
-        // If none with actual offer_letter_url, prepare list of accepted students indicating missing files
         const accepted = (apps || []).filter(app => app.application_status === 'accepted');
         if (accepted.length === 0) {
           Alert.alert('No Documents', 'No offer letters found for accepted students.');
@@ -332,7 +331,6 @@ export default function AdminPlacementsScreen() {
         return;
       }
 
-      // If we have actual URLs, create a text file listing them (zipping files client-side is complicated)
       const offerLettersList = acceptedWithOfferLetters.map((app, index) =>
         `${index + 1}. ${app.students?.student_profiles?.full_name || app.students?.name}\n` +
         `   UID: ${app.students?.uid}\n` +
@@ -459,7 +457,8 @@ export default function AdminPlacementsScreen() {
 
   const viewApplications = async (event: PlacementEvent) => {
     setSelectedEvent(event);
-    await loadEventApplications(event.id);
+    const apps = await loadEventApplications(event.id);
+    setApplications(apps);
     setShowApplicationsModal(true);
   };
 
@@ -475,7 +474,8 @@ export default function AdminPlacementsScreen() {
 
       Alert.alert('Success', 'Application marked as accepted');
       if (selectedEvent?.id) {
-        await loadEventApplications(selectedEvent.id);
+        const apps = await loadEventApplications(selectedEvent.id);
+        setApplications(apps);
 
         // send a notification (best-effort)
         await supabase
@@ -558,9 +558,8 @@ export default function AdminPlacementsScreen() {
                 <TouchableOpacity
                   style={[styles.downloadActionButton, downloading === `excel_${event.id}` && styles.disabledButton]}
                   onPress={async () => {
-                    setSelectedEvent(event);
-                    await loadEventApplications(event.id);
-                    exportApplicationsToExcel();
+                    const apps = await loadEventApplications(event.id);
+                    exportApplicationsToExcel(event, apps);
                   }}
                   disabled={downloading === `excel_${event.id}`}
                 >
@@ -573,8 +572,6 @@ export default function AdminPlacementsScreen() {
                 <TouchableOpacity
                   style={[styles.downloadActionButton, downloading === `offers_${event.id}` && styles.disabledButton]}
                   onPress={async () => {
-                    setSelectedEvent(event);
-                    await loadEventApplications(event.id);
                     downloadPlacementDocuments(event);
                   }}
                   disabled={downloading === `offers_${event.id}`}
@@ -766,7 +763,10 @@ export default function AdminPlacementsScreen() {
               </View>
             ) : (
               <View style={styles.applicationsList}>
-                <TouchableOpacity style={styles.exportButton} onPress={exportApplicationsToExcel}>
+                <TouchableOpacity 
+                  style={styles.exportButton} 
+                  onPress={() => selectedEvent && exportApplicationsToExcel(selectedEvent, applications)}
+                >
                   <Download size={16} color="#34C759" />
                   <Text style={styles.exportButtonText}>Export to Excel</Text>
                 </TouchableOpacity>
@@ -815,7 +815,10 @@ export default function AdminPlacementsScreen() {
                           try {
                             WebBrowser.openBrowserAsync(application.offer_letter_url!, {
                               presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-                              showTitle: true
+                              showTitle: true,
+                              toolbarColor: '#667eea',
+                              controlsColor: '#FFFFFF',
+                              showInRecents: true
                             });
                           } catch (error) {
                             console.error('Error opening offer letter:', error);
@@ -834,23 +837,6 @@ export default function AdminPlacementsScreen() {
                         onPress={() => acceptApplication(application.id)}
                       >
                         <Text style={styles.acceptButtonText}>Mark as Accepted</Text>
-                      </TouchableOpacity>
-                    )}
-
-                    {application.offer_letter_url && (
-                      <TouchableOpacity
-                        style={styles.offerLetterLink}
-                        onPress={() => {
-                          try {
-                            WebBrowser.openBrowserAsync(application.offer_letter_url!);
-                          } catch (error) {
-                            console.error('Error opening offer letter:', error);
-                            Alert.alert('Error', 'Failed to open offer letter.');
-                          }
-                        }}
-                      >
-                        <FileText size={14} color="#007AFF" />
-                        <Text style={styles.offerLetterLinkText}>View Offer Letter</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -1245,9 +1231,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  disabledButton: {
-    backgroundColor: '#C7C7CC',
-  },
   applicationCard: {
     backgroundColor: '#F8F9FA',
     borderRadius: 12,
@@ -1332,18 +1315,6 @@ const styles = StyleSheet.create({
   },
   acceptButtonText: {
     color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  offerLetterLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-    paddingVertical: 4,
-  },
-  offerLetterLinkText: {
-    fontSize: 12,
-    color: '#007AFF',
     fontWeight: '600',
   },
 });
