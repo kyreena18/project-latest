@@ -140,14 +140,13 @@ export default function ClassStudentsView() {
       setLoading(false);
     }
   };
-        });
-        setStudents(transformedData);
-      }
+
+  const downloadFileWithFallback = async (data: string, filename: string, mimeType: string) => {
+    try {
+      return await downloadFile(data, filename, mimeType);
     } catch (error) {
-      console.error('Error loading students:', error);
-      setStudents([]);
-    } finally {
-      setLoading(false);
+      console.error('Download error:', error);
+      return false;
     }
   };
 
